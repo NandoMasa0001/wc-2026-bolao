@@ -1,8 +1,28 @@
+import { useMemo } from 'react';
 import Card from '../components/Card.jsx';
 import Pill from '../components/Pill.jsx';
+import TeamChip from '../components/TeamChip.jsx';
+import { useData } from '../context/DataContext.jsx';
 import './RegulamentoPage.css';
 
 export default function RegulamentoPage() {
+  const { config, teamsByCode, teamBoosts } = useData();
+
+  const sortedOdds = useMemo(() => {
+    const odds = config?.tournamentOdds || {};
+    return Object.entries(odds)
+      .filter(([code]) => teamsByCode[code])
+      .sort((a, b) => b[1] - a[1])
+      .map(([code, prob]) => ({
+        team: teamsByCode[code],
+        prob,
+        boost: teamBoosts[code] || 1
+      }));
+  }, [config, teamsByCode, teamBoosts]);
+
+  const tournamentStartsAt = config?.tournamentStartsAt ? new Date(config.tournamentStartsAt) : null;
+  const oddsLocked = tournamentStartsAt && tournamentStartsAt.getTime() <= Date.now();
+
   return (
     <>
       <h2 className="page-title">Regulamento</h2>
@@ -123,21 +143,48 @@ export default function RegulamentoPage() {
         <p>
           As casas de apostas listam cada seleção pela <em>probabilidade de ser campeã</em>. A gente pega esse ranking e usa pra premiar quem aposta em zebra. <strong>Favorito = 1×, último colocado = 2.5×</strong>, linear no meio.
         </p>
-        <div className="reg-table-wrap">
-          <table className="reg-table">
-            <thead><tr><th>Sua escolha</th><th className="ta-c">Multiplicador (aprox.)</th></tr></thead>
-            <tbody>
-              <tr><td>Brasil, Argentina, França, Espanha (favoritos)</td><td className="ta-c">~1.0×</td></tr>
-              <tr><td>Inglaterra, Alemanha, Portugal (próximos)</td><td className="ta-c">~1.3–1.5×</td></tr>
-              <tr><td>Croácia, Holanda, Uruguai, Marrocos</td><td className="ta-c">~1.7–2.0×</td></tr>
-              <tr><td>Coreia, Senegal, Equador, Suíça</td><td className="ta-c">~2.0–2.3×</td></tr>
-              <tr><td>Cabo Verde, Curaçao, etc (azarões)</td><td className="ta-c">até 2.5×</td></tr>
-            </tbody>
-          </table>
-        </div>
+
+        <details className="reg-details">
+          <summary>
+            {oddsLocked
+              ? <>Ver odds congeladas no início do mundial ({sortedOdds.length} seleções)</>
+              : <>Ver odds atuais ({sortedOdds.length} seleções) — atualiza a cada 10 min até o início do mundial</>
+            }
+          </summary>
+          {sortedOdds.length === 0 ? (
+            <p className="muted reg-foot">
+              Odds ainda não foram puxadas. O cron precisa rodar pelo menos uma vez (GitHub Actions secrets).
+            </p>
+          ) : (
+            <div className="reg-table-wrap">
+              <table className="reg-table reg-odds-table">
+                <thead>
+                  <tr>
+                    <th className="ta-c">#</th>
+                    <th>Seleção</th>
+                    <th className="ta-c">Prob. campeão</th>
+                    <th className="ta-c">Multiplicador</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedOdds.map((row, i) => (
+                    <tr key={row.team.code}>
+                      <td className="ta-c muted">{i + 1}</td>
+                      <td><TeamChip team={row.team} size="sm" showCode /></td>
+                      <td className="ta-c tabular">{(row.prob * 100).toFixed(1)}%</td>
+                      <td className="ta-c tabular"><strong>× {row.boost.toFixed(2)}</strong></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </details>
+
         <p className="muted reg-foot">
           <strong>Aplica em:</strong> classificação, finalistas, e no palpite de campeão das Extras. <br />
-          <strong>NÃO aplica em:</strong> jogos individuais (placar), prêmios individuais, zebra/decepção, e nas outras apostas extras.
+          <strong>NÃO aplica em:</strong> jogos individuais (placar), prêmios individuais, zebra/decepção, e nas outras apostas extras. <br />
+          <strong>Trava em:</strong> {tournamentStartsAt ? tournamentStartsAt.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '11 de junho de 2026'} — depois disso o snapshot fica fixo até o fim da copa.
         </p>
       </Card>
 

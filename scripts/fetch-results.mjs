@@ -71,9 +71,17 @@ async function main() {
   console.log(`  ${apiMatches.length} matches returned.`);
 
   // ---------------- 2b. Odds (optional) ----------------
+  // Odds freeze the moment the tournament starts. After kickoff, the
+  // multipliers in the leaderboard would shift if we kept updating —
+  // unfair to players who already saved picks. Snapshot stays as-is.
   let matchOddsByCodes = new Map();
   let championOdds = null;
-  if (ODDS_API_KEY) {
+  const tournamentStartsAt = cfgRow.tournament_starts_at ? new Date(cfgRow.tournament_starts_at) : null;
+  const tournamentStarted = tournamentStartsAt && tournamentStartsAt.getTime() <= Date.now();
+
+  if (tournamentStarted) {
+    console.log('Tournament has started — odds are locked (skipping the-odds-api fetch).');
+  } else if (ODDS_API_KEY) {
     try {
       console.log('Fetching H2H odds…');
       const { data: teamRows } = await supabase.from('teams').select('code, name');
