@@ -116,8 +116,13 @@ export default function MatchCard({
     onDraftChange?.(match.id, null);
   };
 
+  const cardClasses = [
+    'match-card',
+    hasPrediction && !isFinished ? 'match-card--predicted' : ''
+  ].filter(Boolean).join(' ');
+
   return (
-    <Card className="match-card" as="article">
+    <Card className={cardClasses} as="article">
       <header className="match-card__header">
         <div className="match-card__labels">
           {match.stage === 'group' && match.group && (

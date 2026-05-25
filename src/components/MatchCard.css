@@ -2,6 +2,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
+  transition: background-color var(--dur-normal) var(--ease);
+}
+
+/* Subtle green tint when the user already saved a pick (only on
+   upcoming/live matches — finished ones already signal their state
+   via the gold "+N pts" pill). */
+.match-card--predicted {
+  background: rgba(171, 203, 45, 0.14);
 }
 
 .match-card__header {
