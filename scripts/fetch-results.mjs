@@ -16,7 +16,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { fetchTeamsAndMatches } from '../src/lib/footballApi.js';
-import { fetchMatchOdds, fetchChampionOdds } from '../src/lib/oddsApi.js';
+import { fetchChampionOdds } from '../src/lib/oddsApi.js';
 import {
   baseMatchPoints,
   matchPoints,
@@ -70,11 +70,10 @@ async function main() {
   });
   console.log(`  ${apiMatches.length} matches returned.`);
 
-  // ---------------- 2b. Odds (optional) ----------------
-  // Odds freeze the moment the tournament starts. After kickoff, the
-  // multipliers in the leaderboard would shift if we kept updating —
-  // unfair to players who already saved picks. Snapshot stays as-is.
-  let matchOddsByCodes = new Map();
+  // ---------------- 2b. Championship outright odds (optional) ----------------
+  // Per-match (H2H) odds are NOT used by scoring — the boost only applies
+  // to tournament-long bets via championship outrights. We only fetch the
+  // outrights, and we lock the snapshot the moment the tournament starts.
   let championOdds = null;
   const tournamentStartsAt = cfgRow.tournament_starts_at ? new Date(cfgRow.tournament_starts_at) : null;
   const tournamentStarted = tournamentStartsAt && tournamentStartsAt.getTime() <= Date.now();
@@ -82,24 +81,6 @@ async function main() {
   if (tournamentStarted) {
     console.log('Tournament has started — odds are locked (skipping the-odds-api fetch).');
   } else if (ODDS_API_KEY) {
-    try {
-      console.log('Fetching H2H odds…');
-      const { data: teamRows } = await supabase.from('teams').select('code, name');
-      const nameToCode = {};
-      for (const r of teamRows || []) {
-        if (r.name) nameToCode[r.name.toLowerCase()] = r.code;
-      }
-      const events = await fetchMatchOdds({ apiKey: ODDS_API_KEY });
-      for (const ev of events) {
-        const h = nameToCode[(ev.homeTeamName || '').toLowerCase()];
-        const a = nameToCode[(ev.awayTeamName || '').toLowerCase()];
-        if (!h || !a) continue;
-        matchOddsByCodes.set(`${h}_${a}`, ev.odds);
-      }
-      console.log(`  matched odds for ${matchOddsByCodes.size} matches`);
-    } catch (err) {
-      console.warn('Match-odds fetch failed (continuing without):', err.message);
-    }
     try {
       console.log('Fetching championship outright odds…');
       const championByName = await fetchChampionOdds({ apiKey: ODDS_API_KEY });
@@ -128,27 +109,22 @@ async function main() {
 
   // ---------------- 3. Upsert matches ----------------
   console.log('Upserting matches…');
-  const matchRows = apiMatches.map((m) => {
-    const oddsKey = `${m.homeTeam}_${m.awayTeam}`;
-    const odds = matchOddsByCodes.get(oddsKey) || null;
-    return {
-      id: m.id,
-      api_id: m.apiId ?? null,
-      stage: m.stage,
-      group_letter: m.group,
-      matchday: m.matchday,
-      home_team: m.homeTeam,
-      away_team: m.awayTeam,
-      home_placeholder: m.homePlaceholder,
-      away_placeholder: m.awayPlaceholder,
-      kickoff_at: new Date(m.kickoffAt).toISOString(),
-      status: m.status,
-      home_score: m.homeScore,
-      away_score: m.awayScore,
-      winner: m.winner,
-      ...(odds ? { odds } : {})
-    };
-  });
+  const matchRows = apiMatches.map((m) => ({
+    id: m.id,
+    api_id: m.apiId ?? null,
+    stage: m.stage,
+    group_letter: m.group,
+    matchday: m.matchday,
+    home_team: m.homeTeam,
+    away_team: m.awayTeam,
+    home_placeholder: m.homePlaceholder,
+    away_placeholder: m.awayPlaceholder,
+    kickoff_at: new Date(m.kickoffAt).toISOString(),
+    status: m.status,
+    home_score: m.homeScore,
+    away_score: m.awayScore,
+    winner: m.winner
+  }));
   for (let i = 0; i < matchRows.length; i += 100) {
     const chunk = matchRows.slice(i, i + 100);
     const { error } = await supabase.from('matches').upsert(chunk, { onConflict: 'id' });
