@@ -41,7 +41,15 @@ export const mockConfig = {
     goalkeeper: null,
     topScorer: null,
     darkHorse: null,
-    disappointment: null
+    disappointment: null,
+    // Extras (set by admin after the tournament / during it)
+    firstGoalBrazil: null,
+    lastGoalBrazil:  null,
+    hundredthGoal:   null,
+    totalGoalsWC:    null,
+    neymarGA:        null,
+    topScorerGoals:  null,
+    mbappeRecord:    null
   },
   // Championship outright (implied probability per team). Used to derive
   // per-team boosts for tournament-long bets (advancement, finalists).
@@ -347,7 +355,8 @@ function buildSeedState() {
       advancement: 0,
       finalists: 0,
       awards: 0,
-      poll: 0
+      poll: 0,
+      extras: 0
     };
     const total = Object.values(buckets).reduce((s, v) => s + v, 0);
 
@@ -380,3 +389,4 @@ export const mockAdvancementPredictions = {};   // { [playerId]: { teams, confir
 export const mockFinalsPredictions = {};        // { [playerId]: { finalists, points } }
 export const mockAwardPredictions = {};         // { [playerId]: { bestPlayer, ... } }
 export const mockPollPredictions = {};          // { [playerId]: { darkHorse, disappointment } }
+export const mockExtraPredictions = {};         // { [playerId]: { champion, totalGoalsWC, ... } }

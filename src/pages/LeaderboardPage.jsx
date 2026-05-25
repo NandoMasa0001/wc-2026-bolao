@@ -82,6 +82,10 @@ export default function LeaderboardPage() {
               <span>Zebra</span>
               <strong className="tabular">{selected.points.poll}</strong>
             </div>
+            <div className="breakdown__row">
+              <span>Extras</span>
+              <strong className="tabular">{selected.points.extras || 0}</strong>
+            </div>
             <div className="breakdown__row breakdown__row--total">
               <span>Total</span>
               <strong className="tabular">{selected.points.total}</strong>

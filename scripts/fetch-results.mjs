@@ -24,6 +24,7 @@ import {
   scoreFinalists,
   scoreAwards,
   scorePoll,
+  scoreExtras,
   rankBoostsFromChampionOdds,
   DEFAULT_ROUND_MULTIPLIERS
 } from '../src/lib/scoring.js';
@@ -250,12 +251,13 @@ async function main() {
 
   // ---------------- 6. Tournament-long scoring ----------------
   console.log('Scoring tournament-long predictions…');
-  const [{ data: advRows }, { data: finRows }, { data: awdRows }, { data: pollRows }, { data: playerRows }] =
+  const [{ data: advRows }, { data: finRows }, { data: awdRows }, { data: pollRows }, { data: extraRows }, { data: playerRows }] =
     await Promise.all([
       supabase.from('advancement_predictions').select('*'),
       supabase.from('finals_predictions').select('*'),
       supabase.from('award_predictions').select('*'),
       supabase.from('poll_predictions').select('*'),
+      supabase.from('extra_predictions').select('*'),
       supabase.from('players').select('*')
     ]);
 
@@ -263,11 +265,13 @@ async function main() {
   const finByPlayer  = byId(finRows);
   const awdByPlayer  = byId(awdRows);
   const pollByPlayer = byId(pollRows);
+  const extraByPlayer = byId(extraRows);
 
   const advUpdates = [];
   const finUpdates = [];
   const awdUpdates = [];
   const pollUpdates = [];
+  const extraUpdates = [];
   const playerUpdates = [];
 
   for (const player of playerRows || []) {
@@ -324,13 +328,43 @@ async function main() {
       }
     }
 
-    const total = matchAgg.matches + advancement + finalists + awards + poll;
+    // Extras (8 side bets)
+    let extras = 0;
+    if (extraByPlayer[pid]) {
+      const er = extraByPlayer[pid];
+      const camelPred = {
+        champion:        er.champion,
+        firstGoalBrazil: er.first_goal_brazil,
+        lastGoalBrazil:  er.last_goal_brazil,
+        hundredthGoal:   er.hundredth_goal,
+        totalGoalsWC:    er.total_goals_wc,
+        neymarGA:        er.neymar_ga,
+        topScorerGoals:  er.top_scorer_goals,
+        mbappeRecord:    er.mbappe_record
+      };
+      const extrasActual = {
+        champion:        results.champion,
+        firstGoalBrazil: results.firstGoalBrazil,
+        lastGoalBrazil:  results.lastGoalBrazil,
+        hundredthGoal:   results.hundredthGoal,
+        totalGoalsWC:    results.totalGoalsWC,
+        neymarGA:        results.neymarGA,
+        topScorerGoals:  results.topScorerGoals,
+        mbappeRecord:    results.mbappeRecord
+      };
+      extras = scoreExtras(camelPred, extrasActual, teamBoosts);
+      if (er.points !== extras) {
+        extraUpdates.push({ ...er, points: extras });
+      }
+    }
+
+    const total = matchAgg.matches + advancement + finalists + awards + poll + extras;
 
     playerUpdates.push({
       id: pid,
       points: {
         matches: matchAgg.matches,
-        advancement, finalists, awards, poll,
+        advancement, finalists, awards, poll, extras,
         total
       },
       stats: {
@@ -345,6 +379,7 @@ async function main() {
   await flushUpdates(supabase, 'finals_predictions',      finUpdates, 'player_id');
   await flushUpdates(supabase, 'award_predictions',       awdUpdates, 'player_id');
   await flushUpdates(supabase, 'poll_predictions',        pollUpdates, 'player_id');
+  await flushUpdates(supabase, 'extra_predictions',       extraUpdates, 'player_id');
 
   // Players: update each individually (only writing points + stats).
   for (const p of playerUpdates) {

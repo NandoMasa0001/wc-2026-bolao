@@ -12,7 +12,8 @@ import {
   mockAdvancementPredictions,
   mockFinalsPredictions,
   mockAwardPredictions,
-  mockPollPredictions
+  mockPollPredictions,
+  mockExtraPredictions
 } from '../lib/mockData.js';
 import { computeMatchesBucket, rankBoostsFromChampionOdds } from '../lib/scoring.js';
 
@@ -57,6 +58,7 @@ function MockDataProvider({ children }) {
   const [finalsPredictions, setFinalsPredictions] = useState(mockFinalsPredictions);
   const [awardPredictions, setAwardPredictions] = useState(mockAwardPredictions);
   const [pollPredictions, setPollPredictions] = useState(mockPollPredictions);
+  const [extraPredictions, setExtraPredictions] = useState(mockExtraPredictions);
 
   useEffect(() => {
     if (!session) return;
@@ -73,7 +75,7 @@ function MockDataProvider({ children }) {
           name: session.name,
           isAdmin: session.isAdmin,
           createdAt: new Date().toISOString(),
-          points: { matches: 0, advancement: 0, finalists: 0, awards: 0, poll: 0, total: 0 },
+          points: { matches: 0, advancement: 0, finalists: 0, awards: 0, poll: 0, extras: 0, total: 0 },
           stats: { predictionsMade: 0, exactScores: 0 }
         }
       ];
@@ -212,6 +214,14 @@ function MockDataProvider({ children }) {
     }));
   }, [session]);
 
+  const saveExtras = useCallback(async (extras) => {
+    if (!session) return;
+    setExtraPredictions((prev) => ({
+      ...prev,
+      [session.id]: { ...extras, points: 0 }
+    }));
+  }, [session]);
+
   const updateConfig = useCallback(async (patch) => {
     setConfig((prev) => ({ ...prev, ...patch }));
   }, []);
@@ -234,20 +244,22 @@ function MockDataProvider({ children }) {
       matches, groupMatches, players, predictions,
       predictionsByMatchForMe, predictionsByPlayer,
       advancementPredictions, finalsPredictions, awardPredictions, pollPredictions,
+      extraPredictions,
       teamBoosts,
       me, loading: false,
       savePrediction, saveMatchResult, confirmAdvancement, saveFinalists,
-      saveAwards, savePollPrediction, updateConfig, updateConfigResults,
+      saveAwards, savePollPrediction, saveExtras, updateConfig, updateConfigResults,
       recomputeAllScores
     }),
     [
       config, teams, matches, groupMatches, players, predictions,
       predictionsByMatchForMe, predictionsByPlayer,
       advancementPredictions, finalsPredictions, awardPredictions, pollPredictions,
+      extraPredictions,
       teamBoosts,
       me,
       savePrediction, saveMatchResult, confirmAdvancement, saveFinalists,
-      saveAwards, savePollPrediction, updateConfig, updateConfigResults,
+      saveAwards, savePollPrediction, saveExtras, updateConfig, updateConfigResults,
       recomputeAllScores
     ]
   );
@@ -327,6 +339,18 @@ const fromPollRow = (r) => ({
   darkHorse: r.dark_horse, disappointment: r.disappointment, points: r.points
 });
 
+const fromExtraRow = (r) => ({
+  champion:         r.champion,
+  firstGoalBrazil:  r.first_goal_brazil,
+  lastGoalBrazil:   r.last_goal_brazil,
+  hundredthGoal:    r.hundredth_goal,
+  totalGoalsWC:     r.total_goals_wc,
+  neymarGA:         r.neymar_ga,
+  topScorerGoals:   r.top_scorer_goals,
+  mbappeRecord:     r.mbappe_record,
+  points:           r.points
+});
+
 function SupabaseDataProvider({ children }) {
   const { session } = useAuth();
 
@@ -339,6 +363,7 @@ function SupabaseDataProvider({ children }) {
   const [finalsPredictions, setFinalsPredictions] = useState({});
   const [awardPredictions, setAwardPredictions] = useState({});
   const [pollPredictions, setPollPredictions] = useState({});
+  const [extraPredictions, setExtraPredictions] = useState({});
   const [loading, setLoading] = useState(true);
 
   /* -------------- Initial fetch + realtime channels -------------- */
@@ -356,6 +381,7 @@ function SupabaseDataProvider({ children }) {
       setFinalsPredictions({});
       setAwardPredictions({});
       setPollPredictions({});
+      setExtraPredictions({});
       setLoading(true);
       return;
     }
@@ -399,7 +425,7 @@ function SupabaseDataProvider({ children }) {
       // ---- Initial fetch (parallel) ----
       const [
         cfgRes, teamsRes, matchesRes, playersRes,
-        predsRes, advRes, finRes, awdRes, pollRes
+        predsRes, advRes, finRes, awdRes, pollRes, extraRes
       ] = await Promise.all([
         supabase.from('config').select('*').eq('id', 'tournament').maybeSingle(),
         supabase.from('teams').select('*'),
@@ -409,7 +435,8 @@ function SupabaseDataProvider({ children }) {
         supabase.from('advancement_predictions').select('*'),
         supabase.from('finals_predictions').select('*'),
         supabase.from('award_predictions').select('*'),
-        supabase.from('poll_predictions').select('*')
+        supabase.from('poll_predictions').select('*'),
+        supabase.from('extra_predictions').select('*')
       ]);
 
       if (cancelled) return;
@@ -437,6 +464,7 @@ function SupabaseDataProvider({ children }) {
       setFinalsPredictions(buildKeyed(finRes.data, fromFinRow));
       setAwardPredictions(buildKeyed(awdRes.data, fromAwdRow));
       setPollPredictions(buildKeyed(pollRes.data, fromPollRow));
+      setExtraPredictions(buildKeyed(extraRes.data, fromExtraRow));
 
       setLoading(false);
 
@@ -508,7 +536,8 @@ function SupabaseDataProvider({ children }) {
         ['advancement_predictions', setAdvancementPredictions, fromAdvRow],
         ['finals_predictions',      setFinalsPredictions,      fromFinRow],
         ['award_predictions',       setAwardPredictions,       fromAwdRow],
-        ['poll_predictions',        setPollPredictions,        fromPollRow]
+        ['poll_predictions',        setPollPredictions,        fromPollRow],
+        ['extra_predictions',       setExtraPredictions,       fromExtraRow]
       ];
       for (const [table, setter, mapper] of tlMappers) {
         channels.push(
@@ -656,6 +685,26 @@ function SupabaseDataProvider({ children }) {
     if (error) console.error('savePollPrediction', error);
   }, [session]);
 
+  const saveExtras = useCallback(async (extras) => {
+    if (!session) return;
+    const numOrNull = (v) => (v === '' || v == null ? null : Number(v));
+    const { error } = await supabase
+      .from('extra_predictions')
+      .upsert({
+        player_id: session.id,
+        champion:           extras.champion          || null,
+        first_goal_brazil:  extras.firstGoalBrazil   || null,
+        last_goal_brazil:   extras.lastGoalBrazil    || null,
+        hundredth_goal:     extras.hundredthGoal     || null,
+        total_goals_wc:     numOrNull(extras.totalGoalsWC),
+        neymar_ga:          numOrNull(extras.neymarGA),
+        top_scorer_goals:   numOrNull(extras.topScorerGoals),
+        mbappe_record:      typeof extras.mbappeRecord === 'boolean' ? extras.mbappeRecord : null,
+        points: 0
+      }, { onConflict: 'player_id' });
+    if (error) console.error('saveExtras', error);
+  }, [session]);
+
   const updateConfig = useCallback(async (patch) => {
     if (!me?.isAdmin) return;
     // Convert camelCase patch keys to snake_case columns we know about.
@@ -693,10 +742,11 @@ function SupabaseDataProvider({ children }) {
       matches, groupMatches, players, predictions,
       predictionsByMatchForMe, predictionsByPlayer,
       advancementPredictions, finalsPredictions, awardPredictions, pollPredictions,
+      extraPredictions,
       teamBoosts,
       me, loading,
       savePrediction, saveMatchResult, confirmAdvancement, saveFinalists,
-      saveAwards, savePollPrediction, updateConfig, updateConfigResults,
+      saveAwards, savePollPrediction, saveExtras, updateConfig, updateConfigResults,
       recomputeAllScores
     }),
     [
@@ -704,10 +754,11 @@ function SupabaseDataProvider({ children }) {
       matches, groupMatches, players, predictions,
       predictionsByMatchForMe, predictionsByPlayer,
       advancementPredictions, finalsPredictions, awardPredictions, pollPredictions,
+      extraPredictions,
       teamBoosts,
       me, loading,
       savePrediction, saveMatchResult, confirmAdvancement, saveFinalists,
-      saveAwards, savePollPrediction, updateConfig, updateConfigResults,
+      saveAwards, savePollPrediction, saveExtras, updateConfig, updateConfigResults,
       recomputeAllScores
     ]
   );

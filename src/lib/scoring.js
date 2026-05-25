@@ -212,8 +212,72 @@ export function scorePoll(predicted = {}, actual = {}) {
 }
 
 export function totalPoints(buckets = {}) {
-  const keys = ['matches', 'advancement', 'finalists', 'awards', 'poll'];
+  const keys = ['matches', 'advancement', 'finalists', 'awards', 'poll', 'extras'];
   return keys.reduce((sum, k) => sum + (buckets[k] || 0), 0);
+}
+
+/* -------------------------------------------------------------------- */
+/*  EXTRAS — 8 side-bet categories. See README "Extras".                */
+/* -------------------------------------------------------------------- */
+
+/** Closeness scoring for numeric picks: exact = max, then linearly down. */
+export function scoreCloseness(predicted, actual, max, perUnitOff = 5) {
+  if (predicted == null || actual == null) return 0;
+  const diff = Math.abs(Number(predicted) - Number(actual));
+  return Math.max(0, max - perUnitOff * diff);
+}
+
+/** Exact-match text scoring (case-insensitive, whitespace-trimmed). */
+export function scoreExactText(predicted, actual, points) {
+  if (!predicted || !actual) return 0;
+  const norm = (s) => String(s).trim().toLowerCase();
+  return norm(predicted) === norm(actual) ? points : 0;
+}
+
+/** Boolean scoring. */
+export function scoreBoolean(predicted, actual, points) {
+  if (predicted == null || actual == null) return 0;
+  return Boolean(predicted) === Boolean(actual) ? points : 0;
+}
+
+/**
+ * Compute the "extras" bucket for a player.
+ *
+ * `predicted` and `actual` carry the same camelCase keys (see schema docs).
+ * `teamBoosts` is the rank-based champion map used to boost the `champion`
+ * pick (mirrors how advancement/finalists work).
+ */
+export function scoreExtras(predicted = {}, actual = {}, teamBoosts = {}) {
+  let total = 0;
+
+  // 1. Champion (30 × team boost)
+  if (predicted.champion && actual.champion && predicted.champion === actual.champion) {
+    const boost = teamBoosts[predicted.champion] ?? 1;
+    total += Math.ceil(30 * boost);
+  }
+
+  // 2. Total goals in WC (60 max, −5 per goal off)
+  total += scoreCloseness(predicted.totalGoalsWC, actual.totalGoalsWC, 60);
+
+  // 3. Neymar G+A (30 max, −5 per off)
+  total += scoreCloseness(predicted.neymarGA, actual.neymarGA, 30);
+
+  // 4. Top scorer goal count (20 max, −5 per off)
+  total += scoreCloseness(predicted.topScorerGoals, actual.topScorerGoals, 20);
+
+  // 5. First goal scorer for Brazil (30 pts)
+  total += scoreExactText(predicted.firstGoalBrazil, actual.firstGoalBrazil, 30);
+
+  // 6. Last goal scorer for Brazil (20 pts)
+  total += scoreExactText(predicted.lastGoalBrazil, actual.lastGoalBrazil, 20);
+
+  // 7. 100th goal of the WC (50 pts)
+  total += scoreExactText(predicted.hundredthGoal, actual.hundredthGoal, 50);
+
+  // 8. Does Mbappé break the goals record? (15 pts)
+  total += scoreBoolean(predicted.mbappeRecord, actual.mbappeRecord, 15);
+
+  return total;
 }
 
 /**

@@ -14,7 +14,8 @@ const TABS = [
   { key: 'advancement', label: 'Classificação' },
   { key: 'finalists',   label: 'Finalistas' },
   { key: 'awards',      label: 'Prêmios' },
-  { key: 'poll',        label: 'Zebra' }
+  { key: 'poll',        label: 'Zebra' },
+  { key: 'extras',      label: 'Extras' }
 ];
 
 export default function PredictionsPage() {
@@ -22,8 +23,8 @@ export default function PredictionsPage() {
     teams, teamsByCode, teamsByGroup,
     groupMatches, predictionsByMatchForMe,
     advancementPredictions, finalsPredictions, awardPredictions, pollPredictions,
-    teamBoosts,
-    me, confirmAdvancement, saveFinalists, saveAwards, savePollPrediction
+    extraPredictions, teamBoosts,
+    me, confirmAdvancement, saveFinalists, saveAwards, savePollPrediction, saveExtras
   } = useData();
   const { show } = useToast();
 
@@ -91,6 +92,18 @@ export default function PredictionsPage() {
           onSave={(vals) => {
             savePollPrediction(vals);
             show('Zebra salva', { variant: 'success' });
+          }}
+        />
+      )}
+
+      {tab === 'extras' && (
+        <ExtrasTab
+          teams={teams}
+          teamBoosts={teamBoosts}
+          current={me ? extraPredictions[me.id] : null}
+          onSave={(vals) => {
+            saveExtras(vals);
+            show('Extras salvos', { variant: 'success' });
           }}
         />
       )}
@@ -410,6 +423,174 @@ function PollTab({ teams, current, onSave }) {
         </Button>
       </div>
     </Card>
+  );
+}
+
+/* ====================================================================== */
+/* Extras (8 side bets)                                                   */
+/* ====================================================================== */
+
+function ExtrasTab({ teams, teamBoosts = {}, current, onSave }) {
+  const [vals, setVals] = useState({
+    champion:         current?.champion         || '',
+    totalGoalsWC:     current?.totalGoalsWC     ?? '',
+    neymarGA:         current?.neymarGA         ?? '',
+    topScorerGoals:   current?.topScorerGoals   ?? '',
+    firstGoalBrazil:  current?.firstGoalBrazil  || '',
+    lastGoalBrazil:   current?.lastGoalBrazil   || '',
+    hundredthGoal:    current?.hundredthGoal    || '',
+    mbappeRecord:     current?.mbappeRecord ?? null
+  });
+
+  const update = (k) => (e) => setVals(v => ({ ...v, [k]: e.target.value }));
+  const updateNum = (k) => (e) => {
+    const v = e.target.value.replace(/[^\d]/g, '');
+    setVals(prev => ({ ...prev, [k]: v }));
+  };
+
+  // Order teams by favouritism (same logic as Finalists tab).
+  const sortedTeams = useMemo(() => {
+    return [...teams].sort((a, b) => {
+      const ba = teamBoosts[a.code];
+      const bb = teamBoosts[b.code];
+      if (ba == null && bb == null) return a.name.localeCompare(b.name, 'pt-BR');
+      if (ba == null) return 1;
+      if (bb == null) return -1;
+      return ba - bb;
+    });
+  }, [teams, teamBoosts]);
+
+  const championBoost = vals.champion ? (teamBoosts[vals.champion] || 1) : 1;
+
+  return (
+    <div className="stack">
+      <Card>
+        <h3 className="pred-section-title">O campeão</h3>
+        <p className="muted">
+          A seleção que levanta a taça. <strong>30 pts × multiplicador da seleção</strong> (favoritos = 1×, zebras até 2.5×). Independente de quem é finalista.
+        </p>
+        <label className="pred-field">
+          <span>Campeão da Copa</span>
+          <select value={vals.champion} onChange={update('champion')}>
+            <option value="">— escolha —</option>
+            {sortedTeams.map(t => (
+              <option key={t.code} value={t.code}>
+                {t.name} ({t.code}){teamBoosts[t.code] && teamBoosts[t.code] > 1.05 ? ` — × ${teamBoosts[t.code].toFixed(2)}` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        {vals.champion && championBoost > 1.05 && (
+          <p className="muted">
+            Se acertar: <strong>{Math.ceil(30 * championBoost)} pts</strong>
+          </p>
+        )}
+      </Card>
+
+      <Card>
+        <h3 className="pred-section-title">Apostas numéricas</h3>
+        <p className="muted">
+          Exato = pontuação máxima, <strong>−5 pts por gol de diferença</strong>, mínimo 0.
+        </p>
+        <label className="pred-field">
+          <span>Total de gols na Copa (60 pts)</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={vals.totalGoalsWC}
+            onChange={updateNum('totalGoalsWC')}
+            placeholder="ex: 172"
+          />
+        </label>
+        <label className="pred-field">
+          <span>Gols + assistências do Neymar (30 pts)</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={vals.neymarGA}
+            onChange={updateNum('neymarGA')}
+            placeholder="ex: 5"
+          />
+        </label>
+        <label className="pred-field">
+          <span>Nº de gols do artilheiro da copa (20 pts)</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={vals.topScorerGoals}
+            onChange={updateNum('topScorerGoals')}
+            placeholder="ex: 8"
+          />
+        </label>
+      </Card>
+
+      <Card>
+        <h3 className="pred-section-title">Quem marca</h3>
+        <p className="muted">
+          Texto livre — tem que bater exato com o nome do jogador.
+        </p>
+        <label className="pred-field">
+          <span>Primeiro gol do Brasil na copa (30 pts)</span>
+          <input
+            type="text"
+            value={vals.firstGoalBrazil}
+            onChange={update('firstGoalBrazil')}
+            placeholder="ex: Vinícius Jr."
+          />
+        </label>
+        <label className="pred-field">
+          <span>Último gol do Brasil na copa (20 pts)</span>
+          <input
+            type="text"
+            value={vals.lastGoalBrazil}
+            onChange={update('lastGoalBrazil')}
+            placeholder="ex: Rodrygo"
+          />
+        </label>
+        <label className="pred-field">
+          <span>100º gol da copa (50 pts)</span>
+          <input
+            type="text"
+            value={vals.hundredthGoal}
+            onChange={update('hundredthGoal')}
+            placeholder="quem marca?"
+          />
+        </label>
+      </Card>
+
+      <Card>
+        <h3 className="pred-section-title">Sim ou não</h3>
+        <p className="muted">15 pts cada.</p>
+        <label className="pred-field">
+          <span>Mbappé bate o recorde de gols em copas?</span>
+          <select
+            value={vals.mbappeRecord === true ? 'yes' : vals.mbappeRecord === false ? 'no' : ''}
+            onChange={(e) => {
+              const v = e.target.value;
+              setVals(prev => ({ ...prev, mbappeRecord: v === 'yes' ? true : v === 'no' ? false : null }));
+            }}
+          >
+            <option value="">— não opinei —</option>
+            <option value="yes">Sim</option>
+            <option value="no">Não</option>
+          </select>
+        </label>
+      </Card>
+
+      <div className="pred-confirm__row">
+        <Button
+          variant="primary"
+          onClick={() => onSave({
+            ...vals,
+            totalGoalsWC:    vals.totalGoalsWC    === '' ? null : Number(vals.totalGoalsWC),
+            neymarGA:        vals.neymarGA        === '' ? null : Number(vals.neymarGA),
+            topScorerGoals:  vals.topScorerGoals  === '' ? null : Number(vals.topScorerGoals)
+          })}
+        >
+          Salvar extras
+        </Button>
+      </div>
+    </div>
   );
 }
 

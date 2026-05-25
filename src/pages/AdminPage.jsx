@@ -53,6 +53,18 @@ export default function AdminPage() {
       </section>
 
       <section className="page-section">
+        <h3 className="page-section__title">Resultados das Extras</h3>
+        <ExtrasResults
+          teams={teams}
+          current={config.results || {}}
+          onSave={(patch) => {
+            updateConfigResults(patch);
+            show('Resultados extras salvos', { variant: 'success' });
+          }}
+        />
+      </section>
+
+      <section className="page-section">
         <h3 className="page-section__title">Sobrescrever resultado</h3>
         <MatchOverride
           matches={matches}
@@ -229,6 +241,91 @@ function MatchOverride({ matches, teamsByCode, onSave }) {
           </div>
         </>
       )}
+    </Card>
+  );
+}
+
+function ExtrasResults({ teams, current, onSave }) {
+  const [vals, setVals] = useState({
+    champion:         current.champion         || '',
+    totalGoalsWC:     current.totalGoalsWC     ?? '',
+    neymarGA:         current.neymarGA         ?? '',
+    topScorerGoals:   current.topScorerGoals   ?? '',
+    firstGoalBrazil:  current.firstGoalBrazil  || '',
+    lastGoalBrazil:   current.lastGoalBrazil   || '',
+    hundredthGoal:    current.hundredthGoal    || '',
+    mbappeRecord:     current.mbappeRecord ?? null
+  });
+  const update = (k) => (e) => setVals(v => ({ ...v, [k]: e.target.value }));
+  const updateNum = (k) => (e) => {
+    const v = e.target.value.replace(/[^\d]/g, '');
+    setVals(prev => ({ ...prev, [k]: v }));
+  };
+
+  return (
+    <Card>
+      <label className="pred-field">
+        <span>Campeão</span>
+        <select value={vals.champion} onChange={update('champion')}>
+          <option value="">— ainda não definido —</option>
+          {teams.map(t => <option key={t.code} value={t.code}>{t.name} ({t.code})</option>)}
+        </select>
+      </label>
+      <label className="pred-field">
+        <span>Total de gols na copa</span>
+        <input type="text" inputMode="numeric" value={vals.totalGoalsWC} onChange={updateNum('totalGoalsWC')} />
+      </label>
+      <label className="pred-field">
+        <span>G+A do Neymar</span>
+        <input type="text" inputMode="numeric" value={vals.neymarGA} onChange={updateNum('neymarGA')} />
+      </label>
+      <label className="pred-field">
+        <span>Nº de gols do artilheiro</span>
+        <input type="text" inputMode="numeric" value={vals.topScorerGoals} onChange={updateNum('topScorerGoals')} />
+      </label>
+      <label className="pred-field">
+        <span>Primeiro gol do Brasil (jogador)</span>
+        <input type="text" value={vals.firstGoalBrazil} onChange={update('firstGoalBrazil')} />
+      </label>
+      <label className="pred-field">
+        <span>Último gol do Brasil (jogador)</span>
+        <input type="text" value={vals.lastGoalBrazil} onChange={update('lastGoalBrazil')} />
+      </label>
+      <label className="pred-field">
+        <span>100º gol da copa (jogador)</span>
+        <input type="text" value={vals.hundredthGoal} onChange={update('hundredthGoal')} />
+      </label>
+      <label className="pred-field">
+        <span>Mbappé bateu o recorde?</span>
+        <select
+          value={vals.mbappeRecord === true ? 'yes' : vals.mbappeRecord === false ? 'no' : ''}
+          onChange={(e) => {
+            const v = e.target.value;
+            setVals(prev => ({ ...prev, mbappeRecord: v === 'yes' ? true : v === 'no' ? false : null }));
+          }}
+        >
+          <option value="">— ainda não definido —</option>
+          <option value="yes">Sim</option>
+          <option value="no">Não</option>
+        </select>
+      </label>
+      <div className="pred-confirm__row">
+        <Button
+          variant="primary"
+          onClick={() => onSave({
+            champion:         vals.champion || null,
+            totalGoalsWC:     vals.totalGoalsWC === '' ? null : Number(vals.totalGoalsWC),
+            neymarGA:         vals.neymarGA === '' ? null : Number(vals.neymarGA),
+            topScorerGoals:   vals.topScorerGoals === '' ? null : Number(vals.topScorerGoals),
+            firstGoalBrazil:  vals.firstGoalBrazil || null,
+            lastGoalBrazil:   vals.lastGoalBrazil || null,
+            hundredthGoal:    vals.hundredthGoal || null,
+            mbappeRecord:     vals.mbappeRecord
+          })}
+        >
+          Salvar resultados extras
+        </Button>
+      </div>
     </Card>
   );
 }
