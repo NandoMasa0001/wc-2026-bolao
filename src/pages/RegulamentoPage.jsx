@@ -103,12 +103,12 @@ export default function RegulamentoPage() {
       <Card className="reg-card">
         <h3 className="reg-h">3. Palpites longos do torneio</h3>
         <div className="reg-section">
-          <h4 className="reg-h4">3.1. Classificação <span className="muted">— 5 pts × multiplicador da seleção, por seleção que realmente passar</span></h4>
+          <h4 className="reg-h4">3.1. Classificação <span className="muted">— 5 pts por seleção que realmente passar (sem multiplicador)</span></h4>
           <p>
             Você palpita o placar dos 72 jogos da fase de grupos; o sistema deriva automaticamente quem classifica (16 primeiros lugares + 16 segundos + 8 melhores terceiros = 32 seleções).
-            Quando todos os palpites estiverem completos, você confirma a lista. Cada acerto vale 5 pontos multiplicados pelo <em>multiplicador da seleção</em> (ver item 4).
+            Quando todos os palpites estiverem completos, você confirma a lista. Cada acerto vale <strong>5 pontos flat</strong> — sem boost por seleção (volume de 32 picks já dá peso suficiente).
             <br />
-            <strong>Máximo possível:</strong> ~250 pts.
+            <strong>Máximo possível:</strong> 160 pts (acertando os 32).
           </p>
         </div>
 
@@ -182,8 +182,8 @@ export default function RegulamentoPage() {
         </details>
 
         <p className="muted reg-foot">
-          <strong>Aplica em:</strong> classificação, finalistas, e no palpite de campeão das Extras. <br />
-          <strong>NÃO aplica em:</strong> jogos individuais (placar), prêmios individuais, zebra/decepção, e nas outras apostas extras. <br />
+          <strong>Aplica em:</strong> finalistas, e no palpite de campeão das Extras. <br />
+          <strong>NÃO aplica em:</strong> jogos individuais (placar), classificação (5 pts flat por acerto), prêmios individuais, zebra/decepção, e nas outras apostas extras. <br />
           <strong>Trava em:</strong> {tournamentStartsAt ? tournamentStartsAt.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '11 de junho de 2026'} — depois disso o snapshot fica fixo até o fim da copa.
         </p>
       </Card>

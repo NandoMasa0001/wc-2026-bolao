@@ -35,8 +35,14 @@ const {
   SUPABASE_URL,
   SUPABASE_SERVICE_KEY,
   ODDS_API_KEY,
-  COMPETITION = 'WC'
+  COMPETITION = 'WC',
+  // Skip the football-data.org + the-odds-api fetches and only run
+  // the scoring pass against the current DB state. Useful for testing
+  // (set a match to finished via /admin, then trigger this) and for
+  // re-scoring after a manual edit without waiting for the next cron.
+  SCORING_ONLY
 } = process.env;
+const scoringOnly = SCORING_ONLY === '1' || SCORING_ONLY === 'true';
 
 function need(name, v) {
   if (!v) throw new Error(`Missing env: ${name}`);
@@ -63,12 +69,18 @@ async function main() {
   const multipliers = cfgRow.round_multipliers || DEFAULT_ROUND_MULTIPLIERS;
 
   // ---------------- 2. Fresh matches ----------------
-  console.log('Fetching matches from football-data.org…');
-  const { matches: apiMatches } = await fetchTeamsAndMatches({
-    apiKey: FOOTBALL_API_KEY,
-    competition: COMPETITION
-  });
-  console.log(`  ${apiMatches.length} matches returned.`);
+  let apiMatches = [];
+  if (scoringOnly) {
+    console.log('SCORING_ONLY=1 — skipping football-data.org fetch (re-scoring current DB state).');
+  } else {
+    console.log('Fetching matches from football-data.org…');
+    const result = await fetchTeamsAndMatches({
+      apiKey: FOOTBALL_API_KEY,
+      competition: COMPETITION
+    });
+    apiMatches = result.matches;
+    console.log(`  ${apiMatches.length} matches returned.`);
+  }
 
   // ---------------- 2b. Championship outright odds (optional) ----------------
   // Per-match (H2H) odds are NOT used by scoring — the boost only applies
@@ -78,7 +90,9 @@ async function main() {
   const tournamentStartsAt = cfgRow.tournament_starts_at ? new Date(cfgRow.tournament_starts_at) : null;
   const tournamentStarted = tournamentStartsAt && tournamentStartsAt.getTime() <= Date.now();
 
-  if (tournamentStarted) {
+  if (scoringOnly) {
+    console.log('SCORING_ONLY=1 — skipping odds fetch.');
+  } else if (tournamentStarted) {
     console.log('Tournament has started — odds are locked (skipping the-odds-api fetch).');
   } else if (ODDS_API_KEY) {
     try {
@@ -108,27 +122,29 @@ async function main() {
   }
 
   // ---------------- 3. Upsert matches ----------------
-  console.log('Upserting matches…');
-  const matchRows = apiMatches.map((m) => ({
-    id: m.id,
-    api_id: m.apiId ?? null,
-    stage: m.stage,
-    group_letter: m.group,
-    matchday: m.matchday,
-    home_team: m.homeTeam,
-    away_team: m.awayTeam,
-    home_placeholder: m.homePlaceholder,
-    away_placeholder: m.awayPlaceholder,
-    kickoff_at: new Date(m.kickoffAt).toISOString(),
-    status: m.status,
-    home_score: m.homeScore,
-    away_score: m.awayScore,
-    winner: m.winner
-  }));
-  for (let i = 0; i < matchRows.length; i += 100) {
-    const chunk = matchRows.slice(i, i + 100);
-    const { error } = await supabase.from('matches').upsert(chunk, { onConflict: 'id' });
-    if (error) throw error;
+  if (!scoringOnly) {
+    console.log('Upserting matches…');
+    const matchRows = apiMatches.map((m) => ({
+      id: m.id,
+      api_id: m.apiId ?? null,
+      stage: m.stage,
+      group_letter: m.group,
+      matchday: m.matchday,
+      home_team: m.homeTeam,
+      away_team: m.awayTeam,
+      home_placeholder: m.homePlaceholder,
+      away_placeholder: m.awayPlaceholder,
+      kickoff_at: new Date(m.kickoffAt).toISOString(),
+      status: m.status,
+      home_score: m.homeScore,
+      away_score: m.awayScore,
+      winner: m.winner
+    }));
+    for (let i = 0; i < matchRows.length; i += 100) {
+      const chunk = matchRows.slice(i, i + 100);
+      const { error } = await supabase.from('matches').upsert(chunk, { onConflict: 'id' });
+      if (error) throw error;
+    }
   }
 
   // ---------------- 4. Score predictions ----------------
@@ -262,10 +278,10 @@ async function main() {
     const pid = player.id;
     const matchAgg = playerAgg.get(pid) || { matches: 0, exactScores: 0, predictionsMade: 0 };
 
-    // Advancement
+    // Advancement (flat — no boost)
     let advancement = 0;
     if (officialAdvancing && advByPlayer[pid]?.teams) {
-      advancement = scoreAdvancement(advByPlayer[pid].teams, officialAdvancing, teamBoosts);
+      advancement = scoreAdvancement(advByPlayer[pid].teams, officialAdvancing);
       if (advByPlayer[pid].points !== advancement) {
         advUpdates.push({ ...advByPlayer[pid], points: advancement });
       }

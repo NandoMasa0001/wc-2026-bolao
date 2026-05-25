@@ -145,22 +145,16 @@ export function rankBoostsFromChampionOdds(championOdds = {}, cap = BOOST_CAP) {
 }
 
 /**
- * Advancement: 5 × correct team. Each correct pick is boosted per team.
- *
- * `teamBoosts` (optional) is { teamCode: boostMultiplier }; produce via
- * `rankBoostsFromChampionOdds`. Missing teams default to 1×.
- *
- * Note: per-pick points are rounded up (Math.ceil) before summing so each
- * team's contribution is a whole number on display.
+ * Advancement: flat 5 × correct team. No boost — the volume of picks (up to
+ * 32) makes this category big enough on its own; multiplying would create
+ * runaway scores when someone nails a long-shot heavy bracket.
  */
-export function scoreAdvancement(predictedTeams = [], actualAdvancing = [], teamBoosts = {}) {
+export function scoreAdvancement(predictedTeams = [], actualAdvancing = []) {
   if (!predictedTeams.length || !actualAdvancing.length) return 0;
   const actualSet = new Set(actualAdvancing);
   let total = 0;
   for (const code of predictedTeams) {
-    if (!actualSet.has(code)) continue;
-    const boost = teamBoosts[code] ?? 1;
-    total += Math.ceil(5 * boost);
+    if (actualSet.has(code)) total += 5;
   }
   return total;
 }

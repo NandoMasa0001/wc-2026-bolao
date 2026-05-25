@@ -179,20 +179,14 @@ function AdvancementTab({ groupMatches, teamsByCode, teamsByGroup, predictions, 
       <Card>
         <h3 className="pred-section-title">Seleções que você acha que vão se classificar ({advancingArr.length})</h3>
         <p className="muted">
-          Cada acerto vale <strong>5 pts × multiplicador da seleção</strong>. Zebras valem mais se passarem.
+          Cada acerto vale <strong>5 pts</strong>. Pontuação flat — sem multiplicador.
         </p>
         <div className="pred-advancement__grid">
-          {advancingArr.map((code) => {
-            const boost = teamBoosts[code] || 1;
-            return (
-              <div key={code} className="pred-team-wrap">
-                <TeamChip team={teamsByCode[code]} selected showCode layout="stacked" />
-                {boost > 1.05 && (
-                  <span className="pred-team-boost">× {boost.toFixed(2)}</span>
-                )}
-              </div>
-            );
-          })}
+          {advancingArr.map((code) => (
+            <div key={code} className="pred-team-wrap">
+              <TeamChip team={teamsByCode[code]} selected showCode layout="stacked" />
+            </div>
+          ))}
         </div>
 
         <div className="pred-confirm__row">
