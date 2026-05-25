@@ -1,0 +1,10 @@
+# Cloudflare Workers Static Assets config.
+# Serves the Vite-built /dist folder as static assets with SPA fallback.
+name = "wc-2026-bolao"
+compatibility_date = "2026-05-25"
+
+[assets]
+directory = "./dist"
+# Any request that doesn't match a static asset returns index.html with 200,
+# so React Router handles the client-side route.
+not_found_handling = "single-page-application"
