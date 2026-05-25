@@ -4,13 +4,14 @@ import { useData } from './context/DataContext.jsx';
 
 import ColourBand from './components/ColourBand.jsx';
 import Tabs from './components/Tabs.jsx';
-import { IconBall, IconCheck, IconTrophy, IconCog } from './components/icons.jsx';
+import { IconBall, IconCheck, IconTrophy, IconCog, IconBook } from './components/icons.jsx';
 
 import LoginPage from './pages/LoginPage.jsx';
 import MatchesPage from './pages/MatchesPage.jsx';
 import StandingsPage from './pages/StandingsPage.jsx';
 import PredictionsPage from './pages/PredictionsPage.jsx';
 import LeaderboardPage from './pages/LeaderboardPage.jsx';
+import RegulamentoPage from './pages/RegulamentoPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 
 import './App.css';
@@ -31,7 +32,8 @@ function AppShell({ children }) {
   const baseTabs = [
     { to: '/matches',      label: 'Jogos',         icon: IconBall },
     { to: '/predictions',  label: 'Palpites',      icon: IconCheck },
-    { to: '/leaderboard',  label: 'Classificação', icon: IconTrophy }
+    { to: '/leaderboard',  label: 'Classificação', icon: IconTrophy },
+    { to: '/regulamento',  label: 'Regras',        icon: IconBook }
   ];
   if (me?.isAdmin) baseTabs.push({ to: '/admin', label: 'Admin', icon: IconCog });
 
@@ -88,6 +90,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AppShell><LeaderboardPage /></AppShell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/regulamento"
+        element={
+          <ProtectedRoute>
+            <AppShell><RegulamentoPage /></AppShell>
           </ProtectedRoute>
         }
       />

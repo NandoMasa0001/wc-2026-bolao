@@ -1,0 +1,96 @@
+.reg-intro {
+  margin: 0 0 var(--sp-4);
+}
+
+.reg-card {
+  margin-bottom: var(--sp-4);
+}
+
+.reg-h {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-h2);
+  margin: 0 0 var(--sp-3);
+  color: var(--c-blue);
+}
+
+.reg-h4 {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-h3);
+  margin: 0 0 var(--sp-2);
+}
+
+.reg-section {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px dashed var(--border);
+}
+
+.reg-section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.reg-ol,
+.reg-ul {
+  margin: var(--sp-2) 0;
+  padding-left: var(--sp-5);
+}
+
+.reg-ol li,
+.reg-ul li {
+  margin-bottom: var(--sp-2);
+  line-height: var(--lh-normal);
+}
+
+.reg-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: var(--sp-3) 0 var(--sp-2);
+}
+
+.reg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-small);
+  min-width: 320px;
+}
+
+.reg-table th,
+.reg-table td {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.reg-table th {
+  font-weight: var(--fw-semibold);
+  background: var(--c-blue-soft);
+  color: var(--text-primary);
+  font-size: var(--fs-tiny);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.reg-table .ta-c {
+  text-align: center;
+}
+
+.reg-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.reg-foot {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-small);
+}
+
+.reg-card code {
+  background: var(--bg-app);
+  padding: 1px var(--sp-1);
+  border-radius: var(--r-sm);
+  font-size: 0.92em;
+}
