@@ -49,8 +49,8 @@ export default function LoginPage() {
       setError('Coloca seu nome.');
       return;
     }
-    if (!useMock && !/^\d{4}$/.test(pin)) {
-      setError('PIN deve ter exatamente 4 dígitos.');
+    if (!useMock && !/^\d{6}$/.test(pin)) {
+      setError('PIN deve ter exatamente 6 dígitos.');
       return;
     }
     setBusy(true);
@@ -118,7 +118,7 @@ export default function LoginPage() {
               {!useMock && (
                 <>
                   <label className="login__label" htmlFor="login-pin">
-                    PIN de 4 dígitos
+                    PIN de 6 dígitos
                   </label>
                   <input
                     id="login-pin"
@@ -126,11 +126,11 @@ export default function LoginPage() {
                     type="text"
                     inputMode="numeric"
                     autoComplete="current-password"
-                    pattern="[0-9]{4}"
-                    maxLength={4}
+                    pattern="[0-9]{6}"
+                    maxLength={6}
                     value={pin}
-                    onChange={(e) => setPin(e.target.value.replace(/[^\d]/g, '').slice(0, 4))}
-                    placeholder="••••"
+                    onChange={(e) => setPin(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
+                    placeholder="••••••"
                   />
                   <p className="login__hint muted">
                     Mesmo nome + mesmo PIN em qualquer dispositivo entram na mesma conta. <strong>Anota o PIN.</strong>

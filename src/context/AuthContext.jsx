@@ -150,7 +150,7 @@ function SupabaseAuthProvider({ children }) {
   const signIn = useCallback(async ({ name, pin }) => {
     const trimmed = (name || '').trim();
     if (!trimmed) throw new Error('Coloca seu nome.');
-    if (!pin || !/^\d{4}$/.test(pin)) throw new Error('PIN deve ter exatamente 4 dígitos.');
+    if (!pin || !/^\d{6}$/.test(pin)) throw new Error('PIN deve ter exatamente 6 dígitos.');
 
     const email = nameToSyntheticEmail(trimmed);
     if (email === `@${SYNTH_DOMAIN}`) {
@@ -175,7 +175,7 @@ function SupabaseAuthProvider({ children }) {
           throw new Error('PIN incorreto pra esse nome.');
         }
         if (sMsg.includes('password should') || sMsg.includes('too short') || sMsg.includes('weak')) {
-          throw new Error('PIN muito curto pro servidor — peça pro admin baixar o min length de senha pra 4 no painel Supabase.');
+          throw new Error('PIN muito curto. O Supabase exige no mínimo 6 dígitos.');
         }
         throw new Error(signUpRes.error.message);
       }
