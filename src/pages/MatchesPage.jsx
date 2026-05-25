@@ -8,7 +8,7 @@ import './MatchesPage.css';
 
 /** Primary filter (stage/status). */
 const FILTERS = [
-  { key: 'future', label: 'Todos',       match: (m) => m.status === 'scheduled' },
+  { key: 'future', label: 'Todos',       match: (m) => m.status !== 'finished' },
   { key: 'past',   label: 'Passados',    match: (m) => m.status === 'finished' },
   { key: 'md1',    label: '1ª rodada',   match: (m) => m.stage === 'group' && m.matchday === 1 },
   { key: 'md2',    label: '2ª rodada',   match: (m) => m.stage === 'group' && m.matchday === 2 },

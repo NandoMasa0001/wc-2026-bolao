@@ -6,10 +6,30 @@
 }
 
 /* Subtle green tint when the user already saved a pick (only on
-   upcoming/live matches — finished ones already signal their state
-   via the gold "+N pts" pill). */
+   upcoming matches — finished ones signal via the gold "+N pts" pill,
+   live ones get the red tint below). */
 .match-card--predicted {
   background: rgba(171, 203, 45, 0.14);
+}
+
+/* Live match: subtle red tint + a pulsing left accent so the card
+   stands out in a mixed list. The "Ao vivo" pill in the header carries
+   the explicit text label. */
+.match-card--live {
+  background: rgba(216, 19, 26, 0.07);
+  box-shadow: inset 4px 0 0 var(--c-red), var(--shadow-1);
+  animation: match-live-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes match-live-pulse {
+  0%, 100% { box-shadow: inset 4px 0 0 var(--c-red),       var(--shadow-1); }
+  50%      { box-shadow: inset 4px 0 0 rgba(216,19,26,0.5), var(--shadow-2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match-card--live {
+    animation: none;
+  }
 }
 
 .match-card__header {

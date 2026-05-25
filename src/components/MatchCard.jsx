@@ -118,7 +118,8 @@ export default function MatchCard({
 
   const cardClasses = [
     'match-card',
-    hasPrediction && !isFinished ? 'match-card--predicted' : ''
+    isLive ? 'match-card--live' : '',
+    !isLive && hasPrediction && !isFinished ? 'match-card--predicted' : ''
   ].filter(Boolean).join(' ');
 
   return (
