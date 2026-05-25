@@ -162,13 +162,22 @@ Per-match base (before multipliers):
 
 | Outcome                          | Base |
 |----------------------------------|:----:|
-| Exact score                      | 5    |
+| Exact score                      | 7    |
 | Correct outcome + one team exact | 3    |
 | Correct outcome only             | 2    |
 | One team exact, wrong outcome    | 1    |
 | Nothing                          | 0    |
 
 Round multipliers compound at ×1.25 from the group stage; `Math.ceil` after.
+
+| Stage      | Multiplier | Exact | Outc+1 | Outc | 1 team |
+|------------|:----------:|:-----:|:------:|:----:|:------:|
+| Group      | 1.00       | 7     | 3      | 2    | 1      |
+| R32        | 1.25       | 9     | 4      | 3    | 2      |
+| R16        | 1.5625     | 11    | 5      | 4    | 2      |
+| QF / 3rd   | 1.953125   | 14    | 6      | 4    | 2      |
+| SF         | 2.4414…    | 18    | 8      | 5    | 3      |
+| Final      | 3.0517…    | 22    | 10     | 7    | 4      |
 
 Tournament-long (flat, no round multiplier):
 - Advancement: 5 × correct × team boost.
@@ -191,7 +200,7 @@ boost = 1 + (1 − p) × 1.5, clamped to [1, 2.5]
 - **Awards & Poll**: no boost (no public odds market exists).
 
 The boost multiplies base points *before* the round multiplier, so a long-shot
-final exact score tops out at `ceil(5 × 2.5 × 3.0517…) = 39 pts` instead of 16.
+final exact score tops out at `ceil(7 × 3.0517…) = 22 pts` (no underdog boost on individual matches anymore).
 
 If `ODDS_API_KEY` is missing, the cron skips odds entirely; every pick scores
 at 1×.

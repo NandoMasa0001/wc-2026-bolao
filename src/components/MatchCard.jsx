@@ -230,14 +230,14 @@ export default function MatchCard({
               {isFinished && (
                 <span
                   className={
-                    earnedBase === 5
+                    earnedBase === 7
                       ? 'match-card__verdict match-card__verdict--exact'
                       : earnedBase >= 2
                       ? 'match-card__verdict match-card__verdict--ok'
                       : 'match-card__verdict match-card__verdict--miss'
                   }
                 >
-                  {earnedBase === 5 ? 'Cravou!' : earnedBase >= 2 ? 'Acertou o resultado' : 'Errou'}
+                  {earnedBase === 7 ? 'Cravou!' : earnedBase >= 2 ? 'Acertou o resultado' : 'Errou'}
                 </span>
               )}
               {!isFinished && !locked && (
@@ -254,7 +254,7 @@ export default function MatchCard({
               <aside className="match-card__breakdown" aria-label="Detalhamento da pontuação">
                 <div className="match-card__breakdown-title">Como foi pontuado</div>
                 <BreakdownRow label={
-                  earnedBase === 5 ? 'Placar exato'
+                  earnedBase === 7 ? 'Placar exato'
                   : earnedBase === 3 ? 'Resultado + 1 placar'
                   : earnedBase === 2 ? 'Resultado correto'
                   : earnedBase === 1 ? '1 placar correto'

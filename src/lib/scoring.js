@@ -30,7 +30,7 @@ function sign(n) {
 
 /**
  * Base points for a single match prediction vs the actual result.
- * Returns an integer in {0, 1, 2, 3, 5}.
+ * Returns an integer in {0, 1, 2, 3, 7}.
  */
 export function baseMatchPoints(prediction, actual) {
   if (!prediction || !actual) return 0;
@@ -45,7 +45,7 @@ export function baseMatchPoints(prediction, actual) {
     return 0;
   }
   const teamsMatched = (ph === ah ? 1 : 0) + (pa === aa ? 1 : 0);
-  if (teamsMatched === 2) return 5;
+  if (teamsMatched === 2) return 7;
   const outcomeOK = sign(ph - pa) === sign(ah - aa);
   return (outcomeOK ? 2 : 0) + (teamsMatched === 1 ? 1 : 0);
 }
@@ -293,7 +293,7 @@ export function computeMatchesBucket({ predictions, matches, multipliers = DEFAU
     const pred = predictions[match.id];
     if (!pred) continue;
     const base = baseMatchPoints(pred, match);
-    if (base === 5) exactScores += 1;
+    if (base === 7) exactScores += 1;
     points += matchPoints(pred, match, match.stage, multipliers);
   }
   return { points, exactScores };

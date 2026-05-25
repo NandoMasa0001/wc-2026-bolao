@@ -182,7 +182,7 @@ async function main() {
     agg.predictionsMade += 1;
     if (match.status === 'finished') {
       agg.matches += points;
-      if (baseMatchPoints(predObj, match) === 5) agg.exactScores += 1;
+      if (baseMatchPoints(predObj, match) === 7) agg.exactScores += 1;
     }
   }
 
