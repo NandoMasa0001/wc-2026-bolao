@@ -65,6 +65,7 @@ export default function LeaderboardPage() {
               <th scope="col" className="ta-c" title="Zebra & decepção">Z</th>
               <th scope="col" className="ta-c" title="Apostas extras (campeão, total de gols, etc.)">E</th>
               <th scope="col" className="ta-c lb-total-col">Total</th>
+              <th scope="col" className="ta-c" title="Cravadas — desempate">✓</th>
             </tr>
           </thead>
           <tbody>
@@ -103,6 +104,7 @@ export default function LeaderboardPage() {
                   <td className="ta-c tabular">{p.poll || 0}</td>
                   <td className="ta-c tabular">{p.extras || 0}</td>
                   <td className="ta-c tabular lb-total">{p.total || 0}</td>
+                  <td className="ta-c tabular lb-cravadas">{player.stats?.exactScores || 0}</td>
                 </tr>
               );
             })}
@@ -117,6 +119,7 @@ export default function LeaderboardPage() {
         <li><strong>P</strong> = Prêmios individuais</li>
         <li><strong>Z</strong> = Zebra & decepção</li>
         <li><strong>E</strong> = Apostas extras</li>
+        <li><strong>✓</strong> = Cravadas (desempate)</li>
       </ul>
 
       <Modal

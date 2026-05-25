@@ -119,6 +119,11 @@
   color: var(--c-blue);
 }
 
+.lb-cravadas {
+  color: var(--c-green);
+  font-weight: var(--fw-semibold);
+}
+
 /* Bucket columns: subtle alternating tint for scanability */
 .lb-table tbody td:nth-child(3),
 .lb-table tbody td:nth-child(5),
