@@ -3,8 +3,10 @@ import { supabase, useMock } from '../supabase.js';
 import { mockConfig } from '../lib/mockData.js';
 
 /** Synthesise an email from a username (no real email required). Supabase
- *  needs an email-shaped identifier; we never send mail. */
-const SYNTH_DOMAIN = 'bolaotrupe.local';
+ *  needs an email-shaped identifier and rejects clearly-fake TLDs like
+ *  .local — bolaotrupe.netlify.app is a real domain (our own deploy) which
+ *  passes their validation. We never actually send mail. */
+const SYNTH_DOMAIN = 'bolaotrupe.netlify.app';
 function nameToSyntheticEmail(name) {
   const slug = (name || '')
     .trim()

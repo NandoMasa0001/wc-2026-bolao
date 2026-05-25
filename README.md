@@ -173,7 +173,7 @@ Round multipliers compound at ×1.25 from the group stage; `Math.ceil` after.
 Tournament-long (flat, no round multiplier):
 - Advancement: 5 × correct × team boost.
 - Finalists: 20 × correct × team boost.
-- Awards: 20 × correct (no boost).
+- Awards: 20 × correct, four prizes — best player, young player, goalkeeper, top scorer (max 80). No boost.
 - Poll: 15 × correct (no boost — these markets are themselves underdog picks).
 
 Leaderboard ordering: total ↓ → exact-scores ↓ → name A–Z.

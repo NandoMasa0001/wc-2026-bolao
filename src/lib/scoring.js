@@ -182,11 +182,12 @@ export function scoreFinalists(predictedFinalists = [], actualFinalists = [], te
 
 /**
  * Awards: 20 each, no boost (no public odds market for awards).
+ * Four awards: best player, young player, goalkeeper, top scorer. Max 80.
  */
 export function scoreAwards(predicted = {}, actual = {}) {
   const norm = (s) => (typeof s === 'string' ? s.trim().toLowerCase() : null);
   let points = 0;
-  for (const key of ['bestPlayer', 'youngPlayer', 'goalkeeper']) {
+  for (const key of ['bestPlayer', 'youngPlayer', 'goalkeeper', 'topScorer']) {
     const p = norm(predicted[key]);
     const a = norm(actual[key]);
     if (p && a && p === a) points += 20;

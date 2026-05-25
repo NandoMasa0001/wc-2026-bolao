@@ -305,16 +305,18 @@ function AwardsTab({ current, onSave }) {
   const [vals, setVals] = useState({
     bestPlayer:  current?.bestPlayer  || '',
     youngPlayer: current?.youngPlayer || '',
-    goalkeeper:  current?.goalkeeper  || ''
+    goalkeeper:  current?.goalkeeper  || '',
+    topScorer:   current?.topScorer   || ''
   });
 
   const update = (k) => (e) => setVals(v => ({ ...v, [k]: e.target.value }));
+  const anyFilled = Object.values(vals).some(v => v.trim());
 
   return (
     <Card>
       <h3 className="pred-section-title">Prêmios individuais</h3>
       <p className="muted">
-        Texto livre — tem que bater exato com o nome oficial do vencedor (não diferencia maiúscula/minúscula). 20 pontos cada, máx 60.
+        Texto livre — tem que bater exato com o nome oficial do vencedor (não diferencia maiúscula/minúscula). 20 pontos cada, máx 80.
       </p>
       <div className="pred-awards__grid">
         <label className="pred-field">
@@ -344,12 +346,21 @@ function AwardsTab({ current, onSave }) {
             placeholder="ex: Emiliano Martínez"
           />
         </label>
+        <label className="pred-field">
+          <span>Artilheiro (Chuteira de Ouro)</span>
+          <input
+            type="text"
+            value={vals.topScorer}
+            onChange={update('topScorer')}
+            placeholder="ex: Harry Kane"
+          />
+        </label>
       </div>
       <div className="pred-confirm__row">
         <Button
           variant="primary"
           onClick={() => onSave(vals)}
-          disabled={!vals.bestPlayer.trim() && !vals.youngPlayer.trim() && !vals.goalkeeper.trim()}
+          disabled={!anyFilled}
         >
           Salvar prêmios
         </Button>

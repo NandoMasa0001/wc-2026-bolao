@@ -39,6 +39,7 @@ export const mockConfig = {
     bestPlayer: null,
     youngPlayer: null,
     goalkeeper: null,
+    topScorer: null,
     darkHorse: null,
     disappointment: null
   },

@@ -88,7 +88,8 @@ function AwardsForm({ current, onSave }) {
   const [vals, setVals] = useState({
     bestPlayer:  current.bestPlayer  || '',
     youngPlayer: current.youngPlayer || '',
-    goalkeeper:  current.goalkeeper  || ''
+    goalkeeper:  current.goalkeeper  || '',
+    topScorer:   current.topScorer   || ''
   });
   const update = (k) => (e) => setVals(v => ({ ...v, [k]: e.target.value }));
 
@@ -104,8 +105,12 @@ function AwardsForm({ current, onSave }) {
           <input value={vals.youngPlayer} onChange={update('youngPlayer')} />
         </label>
         <label className="pred-field">
-          <span>Melhor goleiro</span>
+          <span>Melhor goleiro (Luva de Ouro)</span>
           <input value={vals.goalkeeper} onChange={update('goalkeeper')} />
+        </label>
+        <label className="pred-field">
+          <span>Artilheiro (Chuteira de Ouro)</span>
+          <input value={vals.topScorer} onChange={update('topScorer')} />
         </label>
       </div>
       <div className="pred-confirm__row">

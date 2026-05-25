@@ -320,7 +320,8 @@ const fromAdvRow = (r) => ({ teams: r.teams || [], confirmedAt: r.confirmed_at, 
 const fromFinRow = (r) => ({ finalists: r.finalists || [], points: r.points });
 const fromAwdRow = (r) => ({
   bestPlayer: r.best_player, youngPlayer: r.young_player,
-  goalkeeper: r.goalkeeper, points: r.points
+  goalkeeper: r.goalkeeper, topScorer: r.top_scorer,
+  points: r.points
 });
 const fromPollRow = (r) => ({
   darkHorse: r.dark_horse, disappointment: r.disappointment, points: r.points
@@ -627,7 +628,7 @@ function SupabaseDataProvider({ children }) {
     if (error) console.error('saveFinalists', error);
   }, [session]);
 
-  const saveAwards = useCallback(async ({ bestPlayer, youngPlayer, goalkeeper }) => {
+  const saveAwards = useCallback(async ({ bestPlayer, youngPlayer, goalkeeper, topScorer }) => {
     if (!session) return;
     const { error } = await supabase
       .from('award_predictions')
@@ -636,6 +637,7 @@ function SupabaseDataProvider({ children }) {
         best_player: bestPlayer || null,
         young_player: youngPlayer || null,
         goalkeeper: goalkeeper || null,
+        top_scorer: topScorer || null,
         points: 0
       }, { onConflict: 'player_id' });
     if (error) console.error('saveAwards', error);

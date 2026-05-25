@@ -240,7 +240,8 @@ async function main() {
   const awardsActual = {
     bestPlayer: results.bestPlayer,
     youngPlayer: results.youngPlayer,
-    goalkeeper: results.goalkeeper
+    goalkeeper: results.goalkeeper,
+    topScorer: results.topScorer
   };
   const pollActual = {
     darkHorse: results.darkHorse,
@@ -301,7 +302,8 @@ async function main() {
       const camelPred = {
         bestPlayer: awdByPlayer[pid].best_player,
         youngPlayer: awdByPlayer[pid].young_player,
-        goalkeeper: awdByPlayer[pid].goalkeeper
+        goalkeeper: awdByPlayer[pid].goalkeeper,
+        topScorer: awdByPlayer[pid].top_scorer
       };
       awards = scoreAwards(camelPred, awardsActual);
       if (awdByPlayer[pid].points !== awards) {
