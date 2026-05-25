@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [step, setStep] = useState('password'); // 'password' | 'name'
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [pin, setPin] = useState('');
   const [makeAdmin, setMakeAdmin] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -48,9 +49,15 @@ export default function LoginPage() {
       setError('Coloca seu nome.');
       return;
     }
+    if (!useMock && !/^\d{4}$/.test(pin)) {
+      setError('PIN deve ter exatamente 4 dígitos.');
+      return;
+    }
     setBusy(true);
     try {
-      const next = await signIn({ name: trimmed, isAdmin: makeAdmin });
+      const next = useMock
+        ? await signIn({ name: trimmed, isAdmin: makeAdmin })
+        : await signIn({ name: trimmed, pin });
       if (next) navigate('/matches');
     } catch (err) {
       setError(err.message || 'Não foi possível entrar.');
@@ -101,13 +108,35 @@ export default function LoginPage() {
                 id="login-name"
                 className="login__input"
                 type="text"
-                autoComplete="nickname"
+                autoComplete="username"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="ex: Luli"
                 autoFocus
                 maxLength={24}
               />
+              {!useMock && (
+                <>
+                  <label className="login__label" htmlFor="login-pin">
+                    PIN de 4 dígitos
+                  </label>
+                  <input
+                    id="login-pin"
+                    className="login__input tabular"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="current-password"
+                    pattern="[0-9]{4}"
+                    maxLength={4}
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/[^\d]/g, '').slice(0, 4))}
+                    placeholder="••••"
+                  />
+                  <p className="login__hint muted">
+                    Mesmo nome + mesmo PIN em qualquer dispositivo entram na mesma conta. <strong>Anota o PIN.</strong>
+                  </p>
+                </>
+              )}
               {useMock && (
                 <label className="login__checkbox">
                   <input

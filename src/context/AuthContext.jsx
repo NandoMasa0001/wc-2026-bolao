@@ -1,6 +1,20 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { supabase, useMock, ensureAnonymousAuth } from '../supabase.js';
+import { supabase, useMock } from '../supabase.js';
 import { mockConfig } from '../lib/mockData.js';
+
+/** Synthesise an email from a username (no real email required). Supabase
+ *  needs an email-shaped identifier; we never send mail. */
+const SYNTH_DOMAIN = 'bolaotrupe.local';
+function nameToSyntheticEmail(name) {
+  const slug = (name || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')   // strip combining diacritics (Inês → ines)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${slug}@${SYNTH_DOMAIN}`;
+}
 
 /**
  * AuthContext — dual mode.
@@ -83,26 +97,36 @@ function MockAuthProvider({ children }) {
 /* ------------------------------------------------------------------ */
 
 function SupabaseAuthProvider({ children }) {
-  // Local cache so the app shell renders right away after refresh.
-  const [session, setSession] = useState(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [session, setSession] = useState(null);
 
+  // Restore session on mount from Supabase's own token storage.
   useEffect(() => {
-    if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-    else localStorage.removeItem(STORAGE_KEY);
-  }, [session]);
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const sbSession = data?.session;
+      if (cancelled || !sbSession?.user) return;
+      const uid = sbSession.user.id;
+      const { data: row } = await supabase
+        .from('players')
+        .select('name, is_admin')
+        .eq('id', uid)
+        .maybeSingle();
+      if (cancelled || !row) return;
+      setSession({
+        id: uid,
+        name: row.name,
+        isAdmin: !!row.is_admin,
+        signedInAt: new Date().toISOString()
+      });
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-  // Keep local session in sync with Supabase's own session lifecycle (e.g.
-  // expired refresh, manual sign-out from another tab).
+  // React to external auth changes (sign-out from another tab, token expiry).
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((_event, sbSession) => {
-      if (!sbSession) {
+    const { data } = supabase.auth.onAuthStateChange((event, sbSession) => {
+      if (event === 'SIGNED_OUT' || !sbSession?.user) {
         setSession(null);
       }
     });
@@ -110,50 +134,88 @@ function SupabaseAuthProvider({ children }) {
   }, []);
 
   const checkPassword = useCallback(async (pwd) => {
-    // RPC bypasses RLS so the password gate works for unauthenticated
-    // visitors without exposing the password itself.
     const { data, error } = await supabase.rpc('check_shared_password', { pwd });
     if (error) throw new Error(error.message);
     return data === true;
   }, []);
 
-  const signIn = useCallback(async ({ name }) => {
+  /**
+   * Username + 4-digit PIN sign-in/sign-up.
+   *
+   * Same (name, pin) on any device = same UUID, so predictions persist
+   * across devices and after clearing cookies. We synthesise an email
+   * from the username and use Supabase's email+password auth under the
+   * hood — no actual email is ever sent.
+   */
+  const signIn = useCallback(async ({ name, pin }) => {
     const trimmed = (name || '').trim();
-    if (!trimmed) return null;
+    if (!trimmed) throw new Error('Coloca seu nome.');
+    if (!pin || !/^\d{4}$/.test(pin)) throw new Error('PIN deve ter exatamente 4 dígitos.');
 
-    // 1) Anonymous sign-in (Supabase issues a UUID).
-    const user = await ensureAnonymousAuth();
+    const email = nameToSyntheticEmail(trimmed);
+    if (email === `@${SYNTH_DOMAIN}`) {
+      throw new Error('Nome inválido — use letras ou números.');
+    }
+
+    // 1) Try sign-in first.
+    const signInRes = await supabase.auth.signInWithPassword({ email, password: pin });
+    let user = signInRes.data?.user || null;
+
+    if (signInRes.error) {
+      const msg = (signInRes.error.message || '').toLowerCase();
+      const isInvalidCreds =
+        msg.includes('invalid login credentials') || msg.includes('invalid_grant');
+      if (!isInvalidCreds) throw new Error(signInRes.error.message);
+
+      // 2) Sign-in failed — assume new user, sign up.
+      const signUpRes = await supabase.auth.signUp({ email, password: pin });
+      if (signUpRes.error) {
+        const sMsg = (signUpRes.error.message || '').toLowerCase();
+        if (sMsg.includes('already') || sMsg.includes('registered')) {
+          throw new Error('PIN incorreto pra esse nome.');
+        }
+        if (sMsg.includes('password should') || sMsg.includes('too short') || sMsg.includes('weak')) {
+          throw new Error('PIN muito curto pro servidor — peça pro admin baixar o min length de senha pra 4 no painel Supabase.');
+        }
+        throw new Error(signUpRes.error.message);
+      }
+      user = signUpRes.data?.user || null;
+
+      // Some configs require email confirmation; we don't, but be defensive.
+      if (!signUpRes.data?.session) {
+        const retry = await supabase.auth.signInWithPassword({ email, password: pin });
+        if (retry.error) {
+          throw new Error('Conta criada, mas confirmação de email está ativa. Desliga em Authentication → Providers → Email no Supabase.');
+        }
+        user = retry.data?.user || user;
+      }
+    }
+
+    if (!user) throw new Error('Não foi possível autenticar.');
     const uid = user.id;
 
-    // 2) Upsert the player row. RLS only lets us insert when id == auth.uid()
-    //    and is_admin = false. If a row already exists (returning user),
-    //    update its name.
-    const { data: existing, error: selErr } = await supabase
+    // 3) Ensure player row exists, rename if changed.
+    const { data: existing } = await supabase
       .from('players')
-      .select('id, name, is_admin')
+      .select('name, is_admin')
       .eq('id', uid)
       .maybeSingle();
-    if (selErr) throw new Error(selErr.message);
 
     if (!existing) {
       const { error: insErr } = await supabase
         .from('players')
-        .insert({
-          id: uid,
-          name: trimmed,
-          is_admin: false
-        });
+        .insert({ id: uid, name: trimmed, is_admin: false });
       if (insErr) throw new Error(insErr.message);
     } else if (existing.name !== trimmed) {
       const { error: updErr } = await supabase
         .from('players')
         .update({ name: trimmed })
         .eq('id', uid);
-      if (updErr) throw new Error(updErr.message);
+      if (updErr) console.error('player rename:', updErr.message);
     }
 
     const isAdmin = !!existing?.is_admin;
-    const next = { id: uid, name: trimmed, isAdmin, signedInAt: new Date().toISOString() };
+    const next = { id: uid, name: existing?.name || trimmed, isAdmin, signedInAt: new Date().toISOString() };
     setSession(next);
     return next;
   }, []);
