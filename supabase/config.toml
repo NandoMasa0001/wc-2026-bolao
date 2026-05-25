@@ -1,0 +1,3 @@
+# Minimal Supabase CLI config for local linking.
+# The CLI fills in the rest on `supabase init`.
+project_id = "wc-2026-bolao"

@@ -1,0 +1,106 @@
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(26, 34, 48, 0.5);
+  animation: modal-fade var(--dur-normal) var(--ease);
+}
+
+.modal__dialog {
+  position: relative;
+  background: var(--bg-surface);
+  width: 100%;
+  max-height: 92vh;
+  border-top-left-radius: var(--r-xl);
+  border-top-right-radius: var(--r-xl);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-3);
+  animation: sheet-up var(--dur-normal) var(--ease);
+  overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  .modal {
+    align-items: center;
+  }
+  .modal__dialog {
+    width: min(560px, calc(100% - var(--sp-6)));
+    max-height: 85vh;
+    border-radius: var(--r-xl);
+    animation: dialog-pop var(--dur-normal) var(--ease);
+  }
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.modal__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-h1);
+  margin: 0;
+}
+
+.modal__close {
+  background: transparent;
+  border: 0;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-muted);
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-pill);
+}
+
+.modal__close:hover {
+  background: var(--c-blue-soft);
+  color: var(--text-primary);
+}
+
+.modal__body {
+  padding: var(--sp-4);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4) calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border);
+}
+
+@keyframes modal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes dialog-pop {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}

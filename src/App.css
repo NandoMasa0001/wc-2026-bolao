@@ -1,0 +1,21 @@
+.app-header__signout {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: var(--text-on-dark);
+  font-family: var(--font-body);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.app-header__signout:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.app-header__signout:focus-visible {
+  outline: 3px solid var(--c-gold);
+  outline-offset: 2px;
+}

@@ -1,0 +1,70 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 2px var(--sp-2);
+  min-height: 22px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-tiny);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pill--neutral {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.pill--live {
+  background: var(--danger);
+  color: var(--text-on-dark);
+  animation: pill-pulse 1.6s ease-in-out infinite;
+}
+
+.pill--live::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-on-dark);
+  display: inline-block;
+}
+
+@keyframes pill-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.7; }
+}
+
+.pill--locked {
+  background: var(--c-stone);
+  color: var(--text-on-dark);
+}
+
+.pill--points {
+  background: var(--c-gold);
+  color: var(--c-ink);
+}
+
+.pill--success {
+  background: var(--c-lime);
+  color: var(--c-ink);
+}
+
+.pill--warning {
+  background: var(--c-orange);
+  color: var(--c-ink);
+}
+
+.pill--group {
+  background: var(--pill-bg, var(--c-blue));
+  color: var(--text-on-dark);
+}
+
+/* Group colour can be too light for white text (e.g. gold, lime). Use ink. */
+.pill--group[data-light="true"] {
+  color: var(--c-ink);
+}

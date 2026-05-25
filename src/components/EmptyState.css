@@ -1,0 +1,29 @@
+.empty-state {
+  background: var(--bg-surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-6) var(--sp-4);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.empty-state__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-h2);
+  margin: 0;
+}
+
+.empty-state__body {
+  color: var(--text-muted);
+  font-size: var(--fs-body);
+  margin: 0;
+  max-width: 36ch;
+}
+
+.empty-state__action {
+  margin-top: var(--sp-2);
+}

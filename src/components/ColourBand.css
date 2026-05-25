@@ -1,0 +1,19 @@
+.colour-band {
+  height: 4px;
+  width: 100%;
+  background: linear-gradient(
+    to right,
+    var(--c-blue)   0%,
+    var(--c-blue)   16.66%,
+    var(--c-green)  16.66%,
+    var(--c-green)  33.33%,
+    var(--c-lime)   33.33%,
+    var(--c-lime)   50%,
+    var(--c-gold)   50%,
+    var(--c-gold)   66.66%,
+    var(--c-orange) 66.66%,
+    var(--c-orange) 83.33%,
+    var(--c-red)    83.33%,
+    var(--c-red)    100%
+  );
+}

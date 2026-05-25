@@ -1,0 +1,72 @@
+.tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  z-index: 50;
+  box-shadow: 0 -2px 12px rgba(26, 34, 48, 0.06);
+}
+
+.tabs__list {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  max-width: var(--content-max);
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  min-height: var(--tabbar-h);
+}
+
+.tabs__item {
+  display: flex;
+}
+
+.tabs__link {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--sp-1) var(--sp-2);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: var(--fs-tiny);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transition: color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+  min-height: 48px;
+}
+
+.tabs__link:hover {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.tabs__link.is-active {
+  color: var(--c-blue);
+}
+
+.tabs__icon {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tabs__icon svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  fill: none;
+}
+
+.tabs__label {
+  line-height: 1;
+}

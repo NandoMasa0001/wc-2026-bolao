@@ -1,0 +1,128 @@
+/* ============================================================
+   tokens.css — single source of truth for the visual system.
+   Per DESIGN.md: components reference tokens only.
+   Never hardcode a hex value, font name, or pixel size in a
+   component. If you need a value that isn't here, add it here.
+   ============================================================ */
+
+:root {
+  /* ---- Brand (2014 World Cup palette) ---- */
+  --c-blue:        #003469;  /* Ateneo Blue  — primary, headers, nav      */
+  --c-green:       #336F1B;  /* Palm Green   — secondary                  */
+  --c-lime:        #ABCB2D;  /* Juicy Lime   — success, "advanced" state  */
+  --c-gold:        #FDD301;  /* Gold         — primary CTA, highlights    */
+  --c-orange:      #F79516;  /* American Orange — accents, warnings       */
+  --c-red:         #D8131A;  /* Rose Madder  — live matches, danger       */
+
+  /* ---- Brand tints / shades (for hovers, fills, borders) ---- */
+  --c-blue-dark:   #002247;
+  --c-blue-soft:   #E2E9F1;  /* pale blue fill                            */
+  --c-gold-dark:   #E4BD00;  /* gold button hover                         */
+  --c-lime-soft:   #EEF3D5;
+  --c-red-soft:    #FBE3E4;
+
+  /* ---- Neutrals (warm, slightly cream — tropical paper feel) ---- */
+  --c-ink:         #1A2230;  /* primary text                              */
+  --c-stone:       #5F6470;  /* secondary / muted text                    */
+  --c-mist:        #D9D6CB;  /* borders, dividers                         */
+  --c-cloud:       #F4F1E8;  /* app background (warm off-white)           */
+  --c-white:       #FFFFFF;  /* cards, surfaces                           */
+
+  /* ---- Semantic aliases (use these in components) ---- */
+  --bg-app:        var(--c-cloud);
+  --bg-surface:    var(--c-white);
+  --bg-header:     var(--c-blue);
+  --text-primary:  var(--c-ink);
+  --text-muted:    var(--c-stone);
+  --text-on-dark:  var(--c-white);
+  --border:        var(--c-mist);
+
+  --action:        var(--c-gold);     /* primary buttons                  */
+  --action-text:   var(--c-ink);      /* text on gold buttons             */
+  --action-hover:  var(--c-gold-dark);
+
+  --success:       var(--c-lime);     /* team advanced, correct pick      */
+  --warning:       var(--c-orange);   /* deadline soon, partial points    */
+  --danger:        var(--c-red);      /* live match, errors               */
+  --info:          var(--c-blue);
+
+  /* ---- Group colour-coding (12 groups A–L) ---- */
+  --grp-A: var(--c-blue);
+  --grp-B: var(--c-green);
+  --grp-C: var(--c-lime);
+  --grp-D: var(--c-gold);
+  --grp-E: var(--c-orange);
+  --grp-F: var(--c-red);
+  --grp-G: var(--c-blue-dark);
+  --grp-H: #6BA62A;       /* lime-green mix */
+  --grp-I: #F2A33C;       /* warm gold-orange */
+  --grp-J: #A02B73;       /* festive plum */
+  --grp-K: #1F8A8A;       /* tropical teal */
+  --grp-L: #3F4B66;       /* twilight slate */
+
+  /* ---- Typography ---- */
+  --font-display: 'Poppins', system-ui, sans-serif;  /* headings, scores */
+  --font-body:    'Inter', system-ui, sans-serif;    /* everything else  */
+
+  --fs-display:  2rem;     /* 32px — page titles, big score numbers */
+  --fs-h1:       1.5rem;   /* 24px */
+  --fs-h2:       1.25rem;  /* 20px */
+  --fs-h3:       1.0625rem;/* 17px */
+  --fs-body:     1rem;     /* 16px — never smaller for body text    */
+  --fs-small:    0.875rem; /* 14px — captions, metadata             */
+  --fs-tiny:     0.75rem;  /* 12px — pills, labels only             */
+
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+  --fw-black:    800;
+
+  --lh-tight:    1.15;
+  --lh-normal:   1.5;
+
+  /* ---- Spacing (4px base) ---- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+
+  /* ---- Radius ---- */
+  --r-sm:   8px;
+  --r-md:   12px;
+  --r-lg:   16px;
+  --r-xl:   24px;
+  --r-pill: 999px;
+
+  /* ---- Shadows ---- */
+  --shadow-1: 0 1px 2px rgba(26, 34, 48, 0.06);
+  --shadow-2: 0 4px 12px rgba(26, 34, 48, 0.10);
+  --shadow-3: 0 12px 28px rgba(26, 34, 48, 0.16);
+
+  /* ---- Motion ---- */
+  --ease:        cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast:    120ms;
+  --dur-normal:  220ms;
+
+  /* ---- Layout ---- */
+  --content-max: 720px;
+  --page-pad:    var(--sp-4);
+  --tabbar-h:    64px;
+
+  /* ---- Focus ring ---- */
+  --focus-ring: 3px solid var(--c-blue);
+  --focus-offset: 2px;
+}
+
+/* Desktop bump for headings / display, per DESIGN.md §3 */
+@media (min-width: 768px) {
+  :root {
+    --fs-display: 2.5rem;
+    --fs-h1:      1.75rem;
+    --page-pad:   var(--sp-6);
+  }
+}

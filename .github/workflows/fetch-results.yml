@@ -1,0 +1,35 @@
+name: fetch-results
+
+on:
+  schedule:
+    # every 10 minutes — fine for both API free tiers
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: fetch-results
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Run fetch-results
+        env:
+          FOOTBALL_API_KEY:      ${{ secrets.FOOTBALL_API_KEY }}
+          SUPABASE_URL:          ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY:  ${{ secrets.SUPABASE_SERVICE_KEY }}
+          ODDS_API_KEY:          ${{ secrets.ODDS_API_KEY }}
+        run: npm run fetch-results

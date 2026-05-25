@@ -1,0 +1,108 @@
+.matches-filter {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--sp-1);
+  scrollbar-width: thin;
+}
+
+.matches-filter .chip {
+  flex-shrink: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease);
+}
+
+.chip:hover {
+  border-color: var(--c-blue);
+  color: var(--text-primary);
+}
+
+.chip--active {
+  background: var(--c-blue);
+  border-color: var(--c-blue);
+  color: var(--text-on-dark);
+}
+
+.matches-day-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.matches-day__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-h3);
+  margin: 0 0 var(--sp-2);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Matches grid: 1 column on mobile, 2 columns on desktop. */
+.matches-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sp-3);
+}
+
+@media (min-width: 720px) {
+  .matches-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Sticky bulk-save bar, sits above the bottom tabs. */
+.bulk-save-bar {
+  position: fixed;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -8px 24px rgba(26, 34, 48, 0.10);
+  padding: var(--sp-3) var(--page-pad);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  animation: bulkbar-in var(--dur-normal) var(--ease);
+}
+
+.bulk-save-bar__count {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-body);
+  color: var(--text-primary);
+}
+
+.bulk-save-bar__actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+@keyframes bulkbar-in {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}

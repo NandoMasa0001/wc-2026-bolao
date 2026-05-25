@@ -1,0 +1,235 @@
+/**
+ * scoring.js — pure, framework-free scoring functions.
+ *
+ * Used by the web app to preview points and by the GitHub Actions cron
+ * (`scripts/fetch-results.mjs`) to compute official points. Do not import
+ * anything React- or Firebase-specific here.
+ *
+ * See CLAUDE.md §7. Underdog boost spec: README "Underdog boost".
+ */
+
+export const DEFAULT_ROUND_MULTIPLIERS = Object.freeze({
+  group: 1,
+  r32: 1.25,
+  r16: 1.5625,
+  qf: 1.953125,
+  third: 1.953125,
+  sf: 2.44140625,
+  final: 3.0517578125
+});
+
+/** Boost-formula defaults. See README. */
+export const BOOST_K   = 1.5;
+export const BOOST_CAP = 2.5;
+
+function sign(n) {
+  if (n > 0) return 1;
+  if (n < 0) return -1;
+  return 0;
+}
+
+/**
+ * Base points for a single match prediction vs the actual result.
+ * Returns an integer in {0, 1, 2, 3, 5}.
+ */
+export function baseMatchPoints(prediction, actual) {
+  if (!prediction || !actual) return 0;
+  const { homeScore: ph, awayScore: pa } = prediction;
+  const { homeScore: ah, awayScore: aa } = actual;
+  if (
+    ph === null || ph === undefined ||
+    pa === null || pa === undefined ||
+    ah === null || ah === undefined ||
+    aa === null || aa === undefined
+  ) {
+    return 0;
+  }
+  const teamsMatched = (ph === ah ? 1 : 0) + (pa === aa ? 1 : 0);
+  if (teamsMatched === 2) return 5;
+  const outcomeOK = sign(ph - pa) === sign(ah - aa);
+  return (outcomeOK ? 2 : 0) + (teamsMatched === 1 ? 1 : 0);
+}
+
+/**
+ * Compute the boost multiplier from an implied probability.
+ *
+ * boost = 1 + (1 − p) × k, clamped to [1, cap].
+ *
+ *   p = 1.0  → 1.0×   (sure-thing pick, no boost)
+ *   p = 0.5  → 1.75×  (toss-up)
+ *   p = 0.0  → 2.5×   (extreme long-shot)
+ *
+ * Returns 1 if `p` is null/undefined/NaN — i.e. "we have no odds, no boost."
+ */
+export function boostFromProb(impliedProb, k = BOOST_K, cap = BOOST_CAP) {
+  if (impliedProb == null || Number.isNaN(impliedProb)) return 1;
+  const p = Math.max(0, Math.min(1, impliedProb));
+  const boost = 1 + (1 - p) * k;
+  return Math.min(cap, Math.max(1, boost));
+}
+
+/**
+ * Given a prediction and an odds triple, return the implied probability of
+ * the OUTCOME the player picked (home win / draw / away win).
+ *
+ * `odds` shape: { homeWin: number, draw: number, awayWin: number } where
+ * each value is an implied probability (0..1). Returns null if odds are
+ * absent.
+ */
+export function pickedOutcomeProb(prediction, odds) {
+  if (!odds || !prediction) return null;
+  const { homeScore: ph, awayScore: pa } = prediction;
+  if (ph == null || pa == null) return null;
+  const diff = ph - pa;
+  if (diff > 0) return odds.homeWin ?? null;
+  if (diff < 0) return odds.awayWin ?? null;
+  return odds.draw ?? null;
+}
+
+/**
+ * Multiplied match points, rounded up.
+ *
+ *   points = ceil(base × boost × roundMultiplier)
+ *
+ * `options` (optional):
+ *   boost: number — pre-computed multiplier. Overrides anything else.
+ *   odds:  object — H2H odds; if `boost` not provided, we derive it from
+ *                   the player's picked outcome.
+ *
+ * Backward-compatible: callers that don't pass options get boost = 1.
+ */
+export function matchPoints(
+  prediction,
+  actual,
+  stage,
+  multipliers = DEFAULT_ROUND_MULTIPLIERS,
+  options = {}
+) {
+  const base = baseMatchPoints(prediction, actual);
+  if (base === 0) return 0;
+  const mult = multipliers[stage] ?? 1;
+
+  let boost = 1;
+  if (typeof options.boost === 'number') {
+    boost = options.boost;
+  } else if (options.odds) {
+    const p = pickedOutcomeProb(prediction, options.odds);
+    boost = boostFromProb(p);
+  }
+  return Math.ceil(base * boost * mult);
+}
+
+/**
+ * Compute a per-team boost map from championship outright odds via
+ * RANK-BASED scaling.
+ *
+ * `championOdds` is { teamCode: impliedProbabilityToWinChampionship }.
+ * The favorite (highest prob) earns 1×; the longest shot (lowest prob)
+ * earns up to `cap`. Linear in rank.
+ *
+ * Returns { teamCode: boostMultiplier }.
+ */
+export function rankBoostsFromChampionOdds(championOdds = {}, cap = BOOST_CAP) {
+  const entries = Object.entries(championOdds).filter(
+    ([, p]) => typeof p === 'number' && p > 0
+  );
+  if (entries.length < 2) return {};
+  entries.sort((a, b) => b[1] - a[1]); // favorite first
+  const N = entries.length;
+  const out = {};
+  for (let i = 0; i < N; i++) {
+    const synthProb = 1 - i / (N - 1); // rank 0 → 1.0, last → 0.0
+    out[entries[i][0]] = boostFromProb(synthProb, BOOST_K, cap);
+  }
+  return out;
+}
+
+/**
+ * Advancement: 5 × correct team. Each correct pick is boosted per team.
+ *
+ * `teamBoosts` (optional) is { teamCode: boostMultiplier }; produce via
+ * `rankBoostsFromChampionOdds`. Missing teams default to 1×.
+ *
+ * Note: per-pick points are rounded up (Math.ceil) before summing so each
+ * team's contribution is a whole number on display.
+ */
+export function scoreAdvancement(predictedTeams = [], actualAdvancing = [], teamBoosts = {}) {
+  if (!predictedTeams.length || !actualAdvancing.length) return 0;
+  const actualSet = new Set(actualAdvancing);
+  let total = 0;
+  for (const code of predictedTeams) {
+    if (!actualSet.has(code)) continue;
+    const boost = teamBoosts[code] ?? 1;
+    total += Math.ceil(5 * boost);
+  }
+  return total;
+}
+
+/**
+ * Finalists: 20 × correct. Per-team boost applies.
+ */
+export function scoreFinalists(predictedFinalists = [], actualFinalists = [], teamBoosts = {}) {
+  if (!predictedFinalists.length || !actualFinalists.length) return 0;
+  const actualSet = new Set(actualFinalists);
+  let total = 0;
+  for (const code of predictedFinalists) {
+    if (!actualSet.has(code)) continue;
+    const boost = teamBoosts[code] ?? 1;
+    total += Math.ceil(20 * boost);
+  }
+  return total;
+}
+
+/**
+ * Awards: 20 each, no boost (no public odds market for awards).
+ */
+export function scoreAwards(predicted = {}, actual = {}) {
+  const norm = (s) => (typeof s === 'string' ? s.trim().toLowerCase() : null);
+  let points = 0;
+  for (const key of ['bestPlayer', 'youngPlayer', 'goalkeeper']) {
+    const p = norm(predicted[key]);
+    const a = norm(actual[key]);
+    if (p && a && p === a) points += 20;
+  }
+  return points;
+}
+
+/**
+ * Poll: 15 each for darkHorse / disappointment, no boost. These markets
+ * are themselves "underdog" picks by design, so an extra multiplier on top
+ * would double-count.
+ */
+export function scorePoll(predicted = {}, actual = {}) {
+  let points = 0;
+  if (predicted.darkHorse && actual.darkHorse && predicted.darkHorse === actual.darkHorse) {
+    points += 15;
+  }
+  if (predicted.disappointment && actual.disappointment && predicted.disappointment === actual.disappointment) {
+    points += 15;
+  }
+  return points;
+}
+
+export function totalPoints(buckets = {}) {
+  const keys = ['matches', 'advancement', 'finalists', 'awards', 'poll'];
+  return keys.reduce((sum, k) => sum + (buckets[k] || 0), 0);
+}
+
+/**
+ * Recompute a player's `matches` bucket. Flat per-match scoring (no
+ * underdog boost on individual games — that lives on the tournament-long
+ * predictions instead). Returns { points, exactScores }.
+ */
+export function computeMatchesBucket({ predictions, matches, multipliers = DEFAULT_ROUND_MULTIPLIERS }) {
+  let points = 0;
+  let exactScores = 0;
+  for (const match of matches) {
+    if (match.status !== 'finished') continue;
+    const pred = predictions[match.id];
+    if (!pred) continue;
+    const base = baseMatchPoints(pred, match);
+    if (base === 5) exactScores += 1;
+    points += matchPoints(pred, match, match.stage, multipliers);
+  }
+  return { points, exactScores };
+}

@@ -1,0 +1,29 @@
+# Netlify deployment config for the Bolão Copa 2026 SPA.
+#
+# Build: Vite produces a static site in ./dist.
+# Routing: it's a single-page app — every non-asset path must serve index.html
+#          so React Router can handle the client-side routing.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback: any path that didn't match an asset gets index.html.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Long-cache hashed assets (Vite emits hashed filenames).
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"

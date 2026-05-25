@@ -1,0 +1,38 @@
+.standings__hint {
+  margin: 0 0 var(--sp-3);
+}
+
+.standings__groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+@media (min-width: 720px) {
+  .standings__groups {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-4);
+  }
+}
+
+.standings__knockout-header {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.standings__knockout-body {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.standings__knockout-vs {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-h2);
+  text-align: center;
+  color: var(--text-primary);
+}
