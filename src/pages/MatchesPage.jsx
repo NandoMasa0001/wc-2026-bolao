@@ -7,21 +7,24 @@ import { useToast } from '../components/Toast.jsx';
 import './MatchesPage.css';
 
 /**
- * Filter categories. Each one has a predicate that runs over each match.
- * "Todos" (default) means "all future matches" — finished ones live under
- * "Passados".
+ * Filter categories. The `match` predicate may receive a 2nd argument
+ * with the user's predictions-by-match-id map so filters can be aware of
+ * whether the user has picked already.
  */
 const FILTERS = [
-  { key: 'future', label: 'Todos',       match: (m) => m.status !== 'finished' },
-  { key: 'past',   label: 'Passados',    match: (m) => m.status === 'finished' },
-  { key: 'md1',    label: '1ª rodada',   match: (m) => m.stage === 'group' && m.matchday === 1 },
-  { key: 'md2',    label: '2ª rodada',   match: (m) => m.stage === 'group' && m.matchday === 2 },
-  { key: 'md3',    label: '3ª rodada',   match: (m) => m.stage === 'group' && m.matchday === 3 },
-  { key: 'r32',    label: '32-avos',     match: (m) => m.stage === 'r32' },
-  { key: 'r16',    label: 'Oitavas',     match: (m) => m.stage === 'r16' },
-  { key: 'qf',     label: 'Quartas',     match: (m) => m.stage === 'qf' },
-  { key: 'sf',     label: 'Semi',        match: (m) => m.stage === 'sf' || m.stage === 'third' },
-  { key: 'final',  label: 'Final',       match: (m) => m.stage === 'final' }
+  { key: 'future',        label: 'Todos',         match: (m) => m.status !== 'finished' },
+  { key: 'predicted',     label: 'Já palpitei',   match: (m, preds) => !!preds[m.id] },
+  { key: 'not_predicted', label: 'Faltam',        match: (m, preds) =>
+      !preds[m.id] && m.status === 'scheduled' && m.homeTeam && m.awayTeam },
+  { key: 'past',          label: 'Passados',      match: (m) => m.status === 'finished' },
+  { key: 'md1',           label: '1ª rodada',     match: (m) => m.stage === 'group' && m.matchday === 1 },
+  { key: 'md2',           label: '2ª rodada',     match: (m) => m.stage === 'group' && m.matchday === 2 },
+  { key: 'md3',           label: '3ª rodada',     match: (m) => m.stage === 'group' && m.matchday === 3 },
+  { key: 'r32',           label: '32-avos',       match: (m) => m.stage === 'r32' },
+  { key: 'r16',           label: 'Oitavas',       match: (m) => m.stage === 'r16' },
+  { key: 'qf',            label: 'Quartas',       match: (m) => m.stage === 'qf' },
+  { key: 'sf',            label: 'Semi',          match: (m) => m.stage === 'sf' || m.stage === 'third' },
+  { key: 'final',         label: 'Final',         match: (m) => m.stage === 'final' }
 ];
 
 function dayKey(iso) {
@@ -58,7 +61,7 @@ export default function MatchesPage() {
 
   const visible = useMemo(() => {
     const predicate = FILTERS.find(f => f.key === filter)?.match || (() => true);
-    const arr = matches.filter(predicate);
+    const arr = matches.filter(m => predicate(m, predictionsByMatchForMe));
     const rank = (m) => m.status === 'live' ? 0 : m.status === 'scheduled' ? 1 : 2;
     return [...arr].sort((a, b) => {
       const ra = rank(a), rb = rank(b);
@@ -68,7 +71,7 @@ export default function MatchesPage() {
       // Past matches: most recent first. Otherwise chronological.
       return a.status === 'finished' ? tb - ta : ta - tb;
     });
-  }, [matches, filter]);
+  }, [matches, filter, predictionsByMatchForMe]);
 
   const groups = useMemo(() => {
     const map = new Map();
@@ -124,8 +127,16 @@ export default function MatchesPage() {
 
       {visible.length === 0 ? (
         <EmptyState
-          title="Nenhum jogo nesse filtro"
-          body="Tenta outra fase — a maior parte dos palpites é na fase de grupos."
+          title={
+            filter === 'predicted' ? 'Você ainda não palpitou em nada' :
+            filter === 'not_predicted' ? 'Tudo palpitado! 🎉' :
+            'Nenhum jogo nesse filtro'
+          }
+          body={
+            filter === 'predicted' ? 'Volta pra "Todos" e começa a palpitar.' :
+            filter === 'not_predicted' ? 'Todos os jogos pickeáveis já têm seu palpite.' :
+            'Tenta outra fase — a maior parte dos palpites é na fase de grupos.'
+          }
         />
       ) : (
         <div className="matches-day-stack">
