@@ -6,25 +6,26 @@ import { useData } from '../context/DataContext.jsx';
 import { useToast } from '../components/Toast.jsx';
 import './MatchesPage.css';
 
-/**
- * Filter categories. The `match` predicate may receive a 2nd argument
- * with the user's predictions-by-match-id map so filters can be aware of
- * whether the user has picked already.
- */
+/** Primary filter (stage/status). */
 const FILTERS = [
-  { key: 'future',        label: 'Todos',         match: (m) => m.status !== 'finished' },
-  { key: 'predicted',     label: 'Já palpitei',   match: (m, preds) => !!preds[m.id] },
-  { key: 'not_predicted', label: 'Faltam',        match: (m, preds) =>
-      !preds[m.id] && m.status === 'scheduled' && m.homeTeam && m.awayTeam },
-  { key: 'past',          label: 'Passados',      match: (m) => m.status === 'finished' },
-  { key: 'md1',           label: '1ª rodada',     match: (m) => m.stage === 'group' && m.matchday === 1 },
-  { key: 'md2',           label: '2ª rodada',     match: (m) => m.stage === 'group' && m.matchday === 2 },
-  { key: 'md3',           label: '3ª rodada',     match: (m) => m.stage === 'group' && m.matchday === 3 },
-  { key: 'r32',           label: '32-avos',       match: (m) => m.stage === 'r32' },
-  { key: 'r16',           label: 'Oitavas',       match: (m) => m.stage === 'r16' },
-  { key: 'qf',            label: 'Quartas',       match: (m) => m.stage === 'qf' },
-  { key: 'sf',            label: 'Semi',          match: (m) => m.stage === 'sf' || m.stage === 'third' },
-  { key: 'final',         label: 'Final',         match: (m) => m.stage === 'final' }
+  { key: 'future', label: 'Todos',       match: (m) => m.status !== 'finished' },
+  { key: 'past',   label: 'Passados',    match: (m) => m.status === 'finished' },
+  { key: 'md1',    label: '1ª rodada',   match: (m) => m.stage === 'group' && m.matchday === 1 },
+  { key: 'md2',    label: '2ª rodada',   match: (m) => m.stage === 'group' && m.matchday === 2 },
+  { key: 'md3',    label: '3ª rodada',   match: (m) => m.stage === 'group' && m.matchday === 3 },
+  { key: 'r32',    label: '32-avos',     match: (m) => m.stage === 'r32' },
+  { key: 'r16',    label: 'Oitavas',     match: (m) => m.stage === 'r16' },
+  { key: 'qf',     label: 'Quartas',     match: (m) => m.stage === 'qf' },
+  { key: 'sf',     label: 'Semi',        match: (m) => m.stage === 'sf' || m.stage === 'third' },
+  { key: 'final',  label: 'Final',       match: (m) => m.stage === 'final' }
+];
+
+/** Secondary filter (predicted status), combined with the primary above. */
+const PRED_FILTERS = [
+  { key: 'all',       label: 'Todos',       match: () => true },
+  { key: 'predicted', label: 'Já palpitei', match: (m, preds) => !!preds[m.id] },
+  { key: 'pending',   label: 'Faltam',      match: (m, preds) =>
+      !preds[m.id] && m.status === 'scheduled' && m.homeTeam && m.awayTeam }
 ];
 
 function dayKey(iso) {
@@ -42,6 +43,7 @@ export default function MatchesPage() {
   const { show } = useToast();
 
   const [filter, setFilter] = useState('future');
+  const [predFilter, setPredFilter] = useState('all');
   // Drafts: { [matchId]: { homeScore, awayScore } }. Picks the user has
   // touched but not yet committed via per-card or bulk save.
   const [drafts, setDrafts] = useState({});
@@ -60,18 +62,20 @@ export default function MatchesPage() {
   }, []);
 
   const visible = useMemo(() => {
-    const predicate = FILTERS.find(f => f.key === filter)?.match || (() => true);
-    const arr = matches.filter(m => predicate(m, predictionsByMatchForMe));
+    const primary   = FILTERS.find(f => f.key === filter)?.match     || (() => true);
+    const secondary = PRED_FILTERS.find(f => f.key === predFilter)?.match || (() => true);
+    const arr = matches.filter(m =>
+      primary(m) && secondary(m, predictionsByMatchForMe)
+    );
     const rank = (m) => m.status === 'live' ? 0 : m.status === 'scheduled' ? 1 : 2;
     return [...arr].sort((a, b) => {
       const ra = rank(a), rb = rank(b);
       if (ra !== rb) return ra - rb;
       const ta = new Date(a.kickoffAt).getTime();
       const tb = new Date(b.kickoffAt).getTime();
-      // Past matches: most recent first. Otherwise chronological.
       return a.status === 'finished' ? tb - ta : ta - tb;
     });
-  }, [matches, filter, predictionsByMatchForMe]);
+  }, [matches, filter, predFilter, predictionsByMatchForMe]);
 
   const groups = useMemo(() => {
     const map = new Map();
@@ -111,7 +115,7 @@ export default function MatchesPage() {
   return (
     <>
       <h2 className="page-title">Jogos</h2>
-      <div className="matches-filter" role="group" aria-label="Filtrar jogos">
+      <div className="matches-filter" role="group" aria-label="Filtrar por fase">
         {FILTERS.map(({ key, label }) => (
           <button
             type="button"
@@ -125,16 +129,30 @@ export default function MatchesPage() {
         ))}
       </div>
 
+      <div className="matches-filter matches-filter--secondary" role="group" aria-label="Filtrar pelos meus palpites">
+        {PRED_FILTERS.map(({ key, label }) => (
+          <button
+            type="button"
+            key={key}
+            aria-pressed={predFilter === key}
+            className={'chip chip--secondary' + (predFilter === key ? ' chip--active' : '')}
+            onClick={() => setPredFilter(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {visible.length === 0 ? (
         <EmptyState
           title={
-            filter === 'predicted' ? 'Você ainda não palpitou em nada' :
-            filter === 'not_predicted' ? 'Tudo palpitado! 🎉' :
+            predFilter === 'predicted' ? 'Nada palpitado nesse filtro' :
+            predFilter === 'pending' ? 'Tudo palpitado! 🎉' :
             'Nenhum jogo nesse filtro'
           }
           body={
-            filter === 'predicted' ? 'Volta pra "Todos" e começa a palpitar.' :
-            filter === 'not_predicted' ? 'Todos os jogos pickeáveis já têm seu palpite.' :
+            predFilter === 'predicted' ? 'Você ainda não palpitou nenhum desses.' :
+            predFilter === 'pending' ? 'Todos os jogos pickeáveis dessa seleção já têm seu palpite.' :
             'Tenta outra fase — a maior parte dos palpites é na fase de grupos.'
           }
         />

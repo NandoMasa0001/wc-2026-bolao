@@ -1,7 +1,7 @@
 .matches-filter {
   display: flex;
   gap: var(--sp-2);
-  margin-bottom: var(--sp-4);
+  margin-bottom: var(--sp-3);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: var(--sp-1);
@@ -10,6 +10,24 @@
 
 .matches-filter .chip {
   flex-shrink: 0;
+}
+
+/* Secondary row: smaller, subtler, and uses a green-ish active state to
+   match the predicted-card tint. */
+.matches-filter--secondary {
+  margin-bottom: var(--sp-4);
+}
+
+.chip--secondary {
+  min-height: 30px;
+  font-size: var(--fs-tiny);
+  padding: 0 var(--sp-3);
+}
+
+.chip--secondary.chip--active {
+  background: var(--c-lime);
+  border-color: var(--c-lime);
+  color: var(--c-ink);
 }
 
 .chip {
