@@ -9,9 +9,8 @@ import './ConsensoPage.css';
 
 /**
  * /consenso — read-only stats page showing the spread of friends' picks
- * per match. ONLY visible for matches that are already locked (live or
- * finished, OR scheduled with kickoff in the past). This is intentional —
- * showing consensus on open matches would let players scout & copy.
+ * per match, for every match that has at least one prediction (including
+ * still-open ones). Strictly informational.
  */
 
 const STAGE_LABEL = {
@@ -47,22 +46,14 @@ export default function ConsensoPage() {
   }, [players]);
 
   /**
-   * Stats per match — only locked matches included.
+   * Stats per match — any match with at least one prediction shows up.
    */
   const stats = useMemo(() => {
-    const now = Date.now();
     const list = [];
 
     for (const m of matches) {
-      const locked =
-        m.status !== 'scheduled' ||
-        new Date(m.kickoffAt).getTime() <= now;
-      if (!locked) continue;
-
       const preds = Object.values(predictions).filter(p => p.matchId === m.id);
-      if (preds.length === 0) {
-        // no picks at all — still show the match but with empty stats
-      }
+      if (preds.length === 0) continue; // hide matches with no picks
 
       // Tally outcomes
       const outcomes = { home: 0, draw: 0, away: 0 };
@@ -97,12 +88,15 @@ export default function ConsensoPage() {
       });
     }
 
-    // Sort: live first, then finished newest first, then locked-scheduled by kickoff desc.
-    const rank = (s) => s.match.status === 'live' ? 0 : s.match.status === 'finished' ? 1 : 2;
+    // Sort: live first, then scheduled (chronological), then finished (newest first).
+    const rank = (s) => s.match.status === 'live' ? 0 : s.match.status === 'scheduled' ? 1 : 2;
     list.sort((a, b) => {
       const ra = rank(a), rb = rank(b);
       if (ra !== rb) return ra - rb;
-      return new Date(b.match.kickoffAt) - new Date(a.match.kickoffAt);
+      const ta = new Date(a.match.kickoffAt).getTime();
+      const tb = new Date(b.match.kickoffAt).getTime();
+      // Scheduled: soonest first. Finished: most recent first.
+      return a.match.status === 'finished' ? tb - ta : ta - tb;
     });
 
     return list;
@@ -117,14 +111,15 @@ export default function ConsensoPage() {
     <>
       <h2 className="page-title">Consenso</h2>
       <p className="muted consenso-help">
-        Veja o que a maioria palpitou em cada jogo travado. Pra evitar cola, jogos ainda abertos não aparecem aqui.
+        Veja o que a maioria já palpitou em cada jogo. Aparecem só os jogos com pelo menos 1 palpite registrado.
       </p>
 
       <div className="matches-filter" role="group" aria-label="Filtrar por status">
         {[
-          { key: 'all',      label: 'Todos travados' },
-          { key: 'live',     label: 'Ao vivo' },
-          { key: 'finished', label: 'Encerrados' }
+          { key: 'all',       label: 'Todos' },
+          { key: 'scheduled', label: 'A começar' },
+          { key: 'live',      label: 'Ao vivo' },
+          { key: 'finished',  label: 'Encerrados' }
         ].map(({ key, label }) => (
           <button
             type="button"
@@ -140,8 +135,8 @@ export default function ConsensoPage() {
 
       {filtered.length === 0 ? (
         <EmptyState
-          title="Nenhum jogo travado ainda"
-          body="As estatísticas aparecem assim que o primeiro jogo do mundial começar."
+          title="Sem palpites ainda"
+          body="As estatísticas aparecem assim que alguém palpitar."
         />
       ) : (
         <div className="consenso-list">
