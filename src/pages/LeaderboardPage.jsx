@@ -58,13 +58,13 @@ export default function LeaderboardPage() {
             <tr>
               <th scope="col" className="ta-c">#</th>
               <th scope="col">Jogador</th>
+              <th scope="col" className="ta-c lb-total-col">Total</th>
               <th scope="col" className="ta-c" title="Jogos (placar das 104 partidas)">J</th>
               <th scope="col" className="ta-c" title="Classificação (quem passa da fase de grupos)">C</th>
               <th scope="col" className="ta-c" title="Finalistas">F</th>
               <th scope="col" className="ta-c" title="Prêmios individuais (Bola/Luva/Chuteira de Ouro + jovem)">P</th>
               <th scope="col" className="ta-c" title="Zebra & decepção">Z</th>
               <th scope="col" className="ta-c" title="Apostas extras (campeão, total de gols, etc.)">E</th>
-              <th scope="col" className="ta-c lb-total-col">Total</th>
               <th scope="col" className="ta-c" title="Cravadas — desempate">✓</th>
             </tr>
           </thead>
@@ -97,13 +97,13 @@ export default function LeaderboardPage() {
                     {player.name}
                     {player.isAdmin && <span className="lb-admin-tag">admin</span>}
                   </td>
+                  <td className="ta-c tabular lb-total">{p.total || 0}</td>
                   <td className="ta-c tabular">{p.matches || 0}</td>
                   <td className="ta-c tabular">{p.advancement || 0}</td>
                   <td className="ta-c tabular">{p.finalists || 0}</td>
                   <td className="ta-c tabular">{p.awards || 0}</td>
                   <td className="ta-c tabular">{p.poll || 0}</td>
                   <td className="ta-c tabular">{p.extras || 0}</td>
-                  <td className="ta-c tabular lb-total">{p.total || 0}</td>
                   <td className="ta-c tabular lb-cravadas">{player.stats?.exactScores || 0}</td>
                 </tr>
               );

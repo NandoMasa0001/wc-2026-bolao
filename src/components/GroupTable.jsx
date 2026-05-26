@@ -30,6 +30,7 @@ export default function GroupTable({
             <tr>
               <th scope="col" className="ta-c">#</th>
               <th scope="col">Seleção</th>
+              <th scope="col" className="ta-c group-table__pts-col">Pts</th>
               <th scope="col" className="ta-c" title="Jogos">J</th>
               <th scope="col" className="ta-c" title="Vitórias">V</th>
               <th scope="col" className="ta-c" title="Empates">E</th>
@@ -37,7 +38,6 @@ export default function GroupTable({
               <th scope="col" className="ta-c" title="Gols feitos">GP</th>
               <th scope="col" className="ta-c" title="Gols sofridos">GC</th>
               <th scope="col" className="ta-c" title="Saldo de gols">SG</th>
-              <th scope="col" className="ta-c">Pts</th>
             </tr>
           </thead>
           <tbody>
@@ -67,6 +67,7 @@ export default function GroupTable({
                       )}
                     </div>
                   </td>
+                  <td className="ta-c tabular group-table__pts">{row.pts}</td>
                   <td className="ta-c tabular">{row.played}</td>
                   <td className="ta-c tabular">{row.won}</td>
                   <td className="ta-c tabular">{row.drawn}</td>
@@ -74,7 +75,6 @@ export default function GroupTable({
                   <td className="ta-c tabular">{row.gf}</td>
                   <td className="ta-c tabular">{row.ga}</td>
                   <td className="ta-c tabular">{row.gd}</td>
-                  <td className="ta-c tabular group-table__pts">{row.pts}</td>
                 </tr>
               );
             })}

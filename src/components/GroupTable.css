@@ -65,8 +65,15 @@
 }
 
 .group-table__pts {
+  font-family: var(--font-display);
   font-weight: var(--fw-bold);
-  color: var(--text-primary);
+  font-size: var(--fs-h3);
+  color: var(--c-blue);
+}
+
+.group-table__pts-col {
+  background: var(--c-gold) !important;
+  color: var(--c-ink) !important;
 }
 
 /* Row tinting */

@@ -20,3 +20,34 @@
   color: var(--text-muted);
   text-align: center;
 }
+
+.admin-players {
+  list-style: none;
+  margin: var(--sp-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.admin-players__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--bg-app);
+  border-radius: var(--r-md);
+}
+
+.admin-players__info {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.admin-players__pts {
+  font-size: var(--fs-small);
+}

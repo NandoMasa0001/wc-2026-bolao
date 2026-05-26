@@ -233,6 +233,22 @@ function MockDataProvider({ children }) {
     }));
   }, []);
 
+  const deletePlayer = useCallback(async (playerId) => {
+    setPlayers((prev) => prev.filter(p => p.id !== playerId));
+    setPredictions((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next)) {
+        if (next[key].playerId === playerId) delete next[key];
+      }
+      return next;
+    });
+    setAdvancementPredictions((prev) => { const n = { ...prev }; delete n[playerId]; return n; });
+    setFinalsPredictions((prev) => { const n = { ...prev }; delete n[playerId]; return n; });
+    setAwardPredictions((prev) => { const n = { ...prev }; delete n[playerId]; return n; });
+    setPollPredictions((prev) => { const n = { ...prev }; delete n[playerId]; return n; });
+    setExtraPredictions((prev) => { const n = { ...prev }; delete n[playerId]; return n; });
+  }, []);
+
   const teamBoosts = useMemo(
     () => rankBoostsFromChampionOdds(config.tournamentOdds || {}),
     [config.tournamentOdds]
@@ -249,7 +265,7 @@ function MockDataProvider({ children }) {
       me, loading: false,
       savePrediction, saveMatchResult, confirmAdvancement, saveFinalists,
       saveAwards, savePollPrediction, saveExtras, updateConfig, updateConfigResults,
-      recomputeAllScores
+      deletePlayer, recomputeAllScores
     }),
     [
       config, teams, matches, groupMatches, players, predictions,
@@ -260,7 +276,7 @@ function MockDataProvider({ children }) {
       me,
       savePrediction, saveMatchResult, confirmAdvancement, saveFinalists,
       saveAwards, savePollPrediction, saveExtras, updateConfig, updateConfigResults,
-      recomputeAllScores
+      deletePlayer, recomputeAllScores
     ]
   );
 
@@ -731,6 +747,15 @@ function SupabaseDataProvider({ children }) {
     if (error) console.error('updateConfigResults', error);
   }, [me, config]);
 
+  const deletePlayer = useCallback(async (playerId) => {
+    if (!me?.isAdmin) return;
+    // RLS allows admin to delete; ON DELETE CASCADE removes predictions/etc.
+    // The auth.users row stays — if they log back in with same name+PIN
+    // they'll get a fresh players row (with no points). Admin can re-delete.
+    const { error } = await supabase.from('players').delete().eq('id', playerId);
+    if (error) console.error('deletePlayer', error);
+  }, [me]);
+
   const recomputeAllScores = useCallback(async () => {
     // The cron is authoritative in Supabase mode. UI just surfaces a notice.
     console.warn('recomputeAllScores in Supabase mode is owned by the GitHub Actions cron — trigger a manual run there.');
@@ -747,7 +772,7 @@ function SupabaseDataProvider({ children }) {
       me, loading,
       savePrediction, saveMatchResult, confirmAdvancement, saveFinalists,
       saveAwards, savePollPrediction, saveExtras, updateConfig, updateConfigResults,
-      recomputeAllScores
+      deletePlayer, recomputeAllScores
     }),
     [
       config, teams, teamsByCode, teamsByGroup,
@@ -759,7 +784,7 @@ function SupabaseDataProvider({ children }) {
       me, loading,
       savePrediction, saveMatchResult, confirmAdvancement, saveFinalists,
       saveAwards, savePollPrediction, saveExtras, updateConfig, updateConfigResults,
-      recomputeAllScores
+      deletePlayer, recomputeAllScores
     ]
   );
 

@@ -5,14 +5,17 @@ import Button from '../components/Button.jsx';
 import Pill from '../components/Pill.jsx';
 import TeamChip from '../components/TeamChip.jsx';
 import ScoreStepper from '../components/ScoreStepper.jsx';
+import Modal from '../components/Modal.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { useToast } from '../components/Toast.jsx';
 import './AdminPage.css';
 
 export default function AdminPage() {
+  const { session } = useAuth();
   const {
-    me, config, teams, matches, teamsByCode,
-    saveMatchResult, updateConfig, updateConfigResults, recomputeAllScores
+    me, config, teams, matches, teamsByCode, players,
+    saveMatchResult, updateConfig, updateConfigResults, recomputeAllScores, deletePlayer
   } = useData();
   const { show } = useToast();
 
@@ -72,6 +75,18 @@ export default function AdminPage() {
           onSave={(matchId, vals) => {
             saveMatchResult(matchId, vals);
             show('Jogo atualizado', { variant: 'success' });
+          }}
+        />
+      </section>
+
+      <section className="page-section">
+        <h3 className="page-section__title">Jogadores</h3>
+        <PlayersManager
+          players={players}
+          currentId={session?.id}
+          onDelete={async (id, name) => {
+            await deletePlayer(id);
+            show(`${name} removido`, { variant: 'info' });
           }}
         />
       </section>
@@ -241,6 +256,76 @@ function MatchOverride({ matches, teamsByCode, onSave }) {
           </div>
         </>
       )}
+    </Card>
+  );
+}
+
+function PlayersManager({ players, currentId, onDelete }) {
+  const [toDelete, setToDelete] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const sorted = [...players].sort((a, b) => {
+    if (a.isAdmin !== b.isAdmin) return a.isAdmin ? -1 : 1;
+    return a.name.localeCompare(b.name, 'pt-BR');
+  });
+
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    setBusy(true);
+    try {
+      await onDelete(toDelete.id, toDelete.name);
+      setToDelete(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <p className="muted">
+        Removendo um jogador apaga todos os palpites dele. Se a pessoa logar de novo com mesmo nome+PIN, ela volta com uma conta nova (zerada).
+      </p>
+      <ul className="admin-players">
+        {sorted.map(p => (
+          <li key={p.id} className="admin-players__item">
+            <div className="admin-players__info">
+              <strong>{p.name}</strong>
+              {p.isAdmin && <Pill variant="neutral">admin</Pill>}
+              {p.id === currentId && <Pill variant="neutral">você</Pill>}
+              <span className="muted admin-players__pts">{p.points?.total || 0} pts</span>
+            </div>
+            <Button
+              variant="danger"
+              onClick={() => setToDelete(p)}
+              disabled={p.id === currentId}
+              aria-label={`Remover ${p.name}`}
+            >
+              Remover
+            </Button>
+          </li>
+        ))}
+      </ul>
+
+      <Modal
+        open={!!toDelete}
+        onClose={() => setToDelete(null)}
+        title="Confirmar remoção"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setToDelete(null)} disabled={busy}>Cancelar</Button>
+            <Button variant="danger" onClick={confirmDelete} loading={busy}>Remover de vez</Button>
+          </>
+        }
+      >
+        {toDelete && (
+          <p>
+            Tem certeza que quer remover <strong>{toDelete.name}</strong>?
+            <br />
+            Todos os palpites desse jogador (placares, classificação, finalistas, prêmios, zebra e extras) serão deletados em cascata.
+            Essa ação <strong>não pode ser desfeita</strong>.
+          </p>
+        )}
+      </Modal>
     </Card>
   );
 }
