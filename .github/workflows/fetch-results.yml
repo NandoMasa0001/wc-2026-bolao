@@ -20,7 +20,9 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Supabase v2 RealtimeClient requires native WebSocket support,
+          # which only landed in Node 22.
+          node-version: '22'
           cache: 'npm'
 
       - name: Install
