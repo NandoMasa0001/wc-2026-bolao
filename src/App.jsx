@@ -12,6 +12,7 @@ import StandingsPage from './pages/StandingsPage.jsx';
 import PredictionsPage from './pages/PredictionsPage.jsx';
 import LeaderboardPage from './pages/LeaderboardPage.jsx';
 import RegulamentoPage from './pages/RegulamentoPage.jsx';
+import ConsensoPage from './pages/ConsensoPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 
 import './App.css';
@@ -98,6 +99,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AppShell><RegulamentoPage /></AppShell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/consenso"
+        element={
+          <ProtectedRoute>
+            <AppShell><ConsensoPage /></AppShell>
           </ProtectedRoute>
         }
       />

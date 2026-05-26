@@ -37,15 +37,52 @@ function formatKickoff(iso) {
   });
 }
 
-function timeUntil(iso) {
+function formatCountdown(iso) {
   const ms = new Date(iso).getTime() - Date.now();
   if (ms <= 0) return null;
-  const mins = Math.round(ms / 60000);
-  if (mins < 60) return `em ${mins} min`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `em ${hours} h`;
-  const days = Math.round(hours / 24);
-  return `em ${days} d`;
+  const totalSec = Math.floor(ms / 1000);
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  if (days >= 1)  return `em ${days}d ${hours}h`;
+  if (hours >= 1) return `em ${hours}h ${mins.toString().padStart(2, '0')}m`;
+  if (mins >= 1)  return `em ${mins}m ${secs.toString().padStart(2, '0')}s`;
+  return `em ${secs}s`;
+}
+
+/**
+ * Live-updating countdown that re-renders at an interval calibrated to
+ * the time remaining: every second under 1 hour, every minute under
+ * 1 day, every 10 minutes beyond that. Returns null when the target
+ * has already passed.
+ */
+function useCountdown(targetIso) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const target = new Date(targetIso).getTime();
+    const compute = () => {
+      const remaining = target - Date.now();
+      if (remaining <= 0) return null;
+      if (remaining < 60 * 60 * 1000)         return 1000;        // < 1h: tick each second
+      if (remaining < 24 * 60 * 60 * 1000)    return 60 * 1000;   // < 1d: each minute
+      return 10 * 60 * 1000;                                       // else: each 10 min
+    };
+    let interval = compute();
+    if (!interval) return;
+    const id = setInterval(() => {
+      force(n => n + 1);
+      const next = compute();
+      if (!next || next !== interval) {
+        clearInterval(id);
+        // re-mount the effect with the new cadence
+        force(n => n + 1);
+      }
+    }, interval);
+    return () => clearInterval(id);
+  }, [targetIso]);
+
+  return formatCountdown(targetIso);
 }
 
 export default function MatchCard({
@@ -98,6 +135,8 @@ export default function MatchCard({
   const isFinished = match.status === 'finished';
   const hasPrediction = !!prediction;
 
+  const countdown = useCountdown(match.kickoffAt);
+
   // Compute points if finished.
   let earnedBase = 0;
   let earnedPoints = 0;
@@ -146,8 +185,8 @@ export default function MatchCard({
         </div>
         <div className="match-card__kickoff">
           <time dateTime={match.kickoffAt}>{formatKickoff(match.kickoffAt)}</time>
-          {!locked && timeUntil(match.kickoffAt) && (
-            <span className="match-card__until"> · trava {timeUntil(match.kickoffAt)}</span>
+          {!locked && countdown && (
+            <span className="match-card__until tabular"> · trava {countdown}</span>
           )}
         </div>
       </header>

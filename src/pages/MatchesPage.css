@@ -1,3 +1,31 @@
+.matches-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.matches-header .page-title {
+  margin: 0;
+}
+
+.matches-header__link {
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  color: var(--c-blue);
+  text-decoration: none;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+
+.matches-header__link:hover {
+  background: var(--c-blue-soft);
+  text-decoration: none;
+}
+
 .matches-filter {
   display: flex;
   gap: var(--sp-2);

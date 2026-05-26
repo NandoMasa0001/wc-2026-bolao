@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import MatchCard from '../components/MatchCard.jsx';
 import Button from '../components/Button.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -114,7 +115,12 @@ export default function MatchesPage() {
 
   return (
     <>
-      <h2 className="page-title">Jogos</h2>
+      <div className="matches-header">
+        <h2 className="page-title">Jogos</h2>
+        <Link to="/consenso" className="matches-header__link">
+          Ver consenso →
+        </Link>
+      </div>
       <div className="matches-filter" role="group" aria-label="Filtrar por fase">
         {FILTERS.map(({ key, label }) => (
           <button
