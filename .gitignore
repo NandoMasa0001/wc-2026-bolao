@@ -9,3 +9,6 @@ supabase/.temp/
 supabase/.branches/
 .claude/
 *.log
+# Local screenshots / reference images
+Screenshot*.png
+*.heic
