@@ -1,6 +1,6 @@
 # Cloudflare Workers Static Assets config.
 # Serves the Vite-built /dist folder as static assets with SPA fallback.
-name = "wc-2026-bolao"
+name = "bolaofamilia"
 compatibility_date = "2026-05-25"
 
 [assets]
