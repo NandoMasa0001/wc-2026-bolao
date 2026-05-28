@@ -8,7 +8,7 @@ import Modal from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { computeStandings, predictedMatchesFromPlayer } from '../lib/standings.js';
-import { buildFullBracket } from '../lib/predictedBracket.js';
+import { buildFullBracket, buildBracketColumns } from '../lib/predictedBracket.js';
 import './PredictionsPage.css';
 
 const TABS = [
@@ -209,12 +209,11 @@ function AdvancementTab({ groupMatches, allMatches, teamsByCode, teamsByGroup, p
         </div>
       </Card>
 
-      <Card>
+      <Card className="bracket-card">
         <PredictedBracket
           standings={standings}
           teamsByCode={teamsByCode}
           allMatches={allMatches}
-          predictions={predictions}
         />
       </Card>
 
@@ -252,20 +251,13 @@ function AdvancementTab({ groupMatches, allMatches, teamsByCode, teamsByGroup, p
 /* Predicted R32 bracket                                                  */
 /* ====================================================================== */
 
-const STAGE_LABELS = {
-  r32:   'Round of 32',
-  r16:   'Oitavas',
-  qf:    'Quartas',
-  sf:    'Semis',
-  third: '3º lugar',
-  final: 'Final'
-};
-
-function PredictedBracket({ standings, teamsByCode, allMatches, predictions }) {
+function PredictedBracket({ standings, teamsByCode, allMatches }) {
   const bracket = useMemo(
-    () => buildFullBracket({ standings, matches: allMatches || [], predictionsByMatchForMe: predictions || {} }),
-    [standings, allMatches, predictions]
+    () => buildFullBracket({ standings, matches: allMatches || [] }),
+    [standings, allMatches]
   );
+
+  const cols = useMemo(() => buildBracketColumns(bracket), [bracket]);
 
   if (!bracket.length) {
     return (
@@ -275,71 +267,93 @@ function PredictedBracket({ standings, teamsByCode, allMatches, predictions }) {
     );
   }
 
-  // Group by stage in order.
-  const byStage = {};
-  for (const m of bracket) {
-    if (!byStage[m.stage]) byStage[m.stage] = [];
-    byStage[m.stage].push(m);
-  }
-  const stageOrder = ['r32', 'r16', 'qf', 'sf', 'third', 'final'];
-
   return (
     <>
       <h3 className="pred-section-title">Mata-mata previsto</h3>
       <p className="muted">
-        Bracket oficial FIFA preenchido com as seleções que você palpitou pra passar.
-        Vencedores das rodadas seguintes vêm dos seus <strong>palpites de placar</strong> nos jogos de mata-mata (em <em>Jogos</em>).
-        Empate → próximo confronto fica em branco.
+        Bracket completo. As seleções da primeira coluna são as que você palpitou pra passar da fase de grupos.
+        As bolinhas vão sendo preenchidas com a bandeira do vencedor real conforme os jogos do mata-mata terminarem.
       </p>
 
-      <div className="bracket-stack">
-        {stageOrder.map(stage => byStage[stage] && (
-          <section key={stage} className="bracket-stage">
-            <h4 className="bracket-stage__title">{STAGE_LABELS[stage]}</h4>
-            <div className="bracket-grid">
-              {byStage[stage].map(m => (
-                <BracketCell key={m.id} match={m} teamsByCode={teamsByCode} />
+      <div className="bracket-tree">
+        <div className="bracket-half bracket-half--left">
+          {cols.left.map((col, i) => (
+            <div key={i} className="bracket-col">
+              {col.map((cell, j) => (
+                <BracketSlot key={j} slot={cell} teamsByCode={teamsByCode} side="left" />
               ))}
             </div>
-          </section>
-        ))}
+          ))}
+        </div>
+
+        <BracketCenter final={cols.final} third={cols.third} teamsByCode={teamsByCode} />
+
+        <div className="bracket-half bracket-half--right">
+          {cols.right.map((col, i) => (
+            <div key={i} className="bracket-col">
+              {col.map((cell, j) => (
+                <BracketSlot key={j} slot={cell} teamsByCode={teamsByCode} side="right" />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     </>
   );
 }
 
-function BracketCell({ match: m, teamsByCode }) {
-  const home = m.home ? teamsByCode[m.home] : null;
-  const away = m.away ? teamsByCode[m.away] : null;
-  const homeWon = m.winner && m.winner === m.home;
-  const awayWon = m.winner && m.winner === m.away;
-  const score = m.predictedScore;
-
-  return (
-    <div className="bracket-cell" title={`${m.id} · ${m.homeLabel} vs ${m.awayLabel}`}>
-      <span className="bracket-cell__num">{m.id}</span>
-      <div className="bracket-cell__row">
-        <BracketSide team={home} fallback={m.homeLabel} highlight={homeWon} />
-        <span className="bracket-cell__score tabular">
-          {score ? `${score.homeScore}–${score.awayScore}` : 'vs'}
-        </span>
-        <BracketSide team={away} fallback={m.awayLabel} highlight={awayWon} reverse />
+function BracketSlot({ slot, teamsByCode, side }) {
+  const team = slot.team ? teamsByCode[slot.team] : null;
+  if (team) {
+    return (
+      <div className={`bracket-row bracket-row--${side} is-filled`}>
+        <img className="bracket-row__flag" src={team.flagUrl} alt={team.name} width="22" height="14" />
+        <span className="bracket-row__code">{team.code}</span>
       </div>
+    );
+  }
+  return (
+    <div className={`bracket-row bracket-row--${side} is-empty`} title={slot.label}>
+      <span className="bracket-row__empty" aria-hidden="true" />
     </div>
   );
 }
 
-function BracketSide({ team, fallback, highlight, reverse }) {
+function BracketCenter({ final, third, teamsByCode }) {
+  const champion = final?.winner ? teamsByCode[final.winner] : null;
+  const t3home   = third?.home   ? teamsByCode[third.home]    : null;
+  const t3away   = third?.away   ? teamsByCode[third.away]    : null;
+  const t3winner = third?.winner ? teamsByCode[third.winner]  : null;
   return (
-    <div className={'bracket-side' + (highlight ? ' is-winner' : '') + (reverse ? ' bracket-side--reverse' : '')}>
-      {team ? (
-        <>
-          <img className="bracket-side__flag" src={team.flagUrl} alt={team.name} width="28" height="20" />
-          <span className="bracket-side__code">{team.code}</span>
-        </>
+    <div className="bracket-center">
+      <div className="bracket-trophy" aria-hidden="true">🏆</div>
+      {champion ? (
+        <div className="bracket-champion">
+          <img src={champion.flagUrl} alt={champion.name} className="bracket-champion__flag" width="42" height="28" />
+          <strong className="bracket-champion__code">{champion.code}</strong>
+          <span className="bracket-champion__label">Campeão</span>
+        </div>
       ) : (
-        <span className="bracket-side__placeholder">{fallback || '?'}</span>
+        <div className="bracket-center__placeholder">Campeão</div>
       )}
+
+      <div className="bracket-third">
+        <span className="bracket-third__label">3º lugar</span>
+        {t3winner ? (
+          <div className="bracket-third__winner">
+            <img src={t3winner.flagUrl} alt={t3winner.name} width="22" height="14" />
+            <span>{t3winner.code}</span>
+          </div>
+        ) : t3home && t3away ? (
+          <div className="bracket-third__pair">
+            <img src={t3home.flagUrl} alt={t3home.name} width="18" height="12" />
+            <span>vs</span>
+            <img src={t3away.flagUrl} alt={t3away.name} width="18" height="12" />
+          </div>
+        ) : (
+          <div className="bracket-third__empty">a definir</div>
+        )}
+      </div>
     </div>
   );
 }

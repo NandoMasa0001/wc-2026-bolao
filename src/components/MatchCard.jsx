@@ -95,8 +95,10 @@ export default function MatchCard({
   onSave,
   onDraftChange  // (matchId, { homeScore, awayScore } | null) -> void
 }) {
-  const isKnockoutPlaceholder =
-    match.stage !== 'group' && (!match.homeTeam || !match.awayTeam);
+  // Knockout matches are visualization-only — never user-predictable.
+  // The bracket on /palpites shows them; predictions only happen on
+  // group-stage games.
+  const isKnockoutPlaceholder = match.stage !== 'group';
 
   // Source of truth precedence: draft > saved prediction > 0/0.
   const initialHome = draft?.homeScore ?? prediction?.homeScore ?? 0;
@@ -227,7 +229,7 @@ export default function MatchCard({
       <div className="match-card__prediction">
         {isKnockoutPlaceholder ? (
           <p className="match-card__hint muted">
-            Palpitável quando os jogos anteriores terminarem.
+            Mata-mata — visualização. Veja o bracket completo em <strong>Palpites → Classificação</strong>.
           </p>
         ) : showSteppers ? (
           <>

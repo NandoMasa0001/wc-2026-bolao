@@ -100,15 +100,22 @@ function buildFifaToDbMap(matches) {
 /**
  * @param {object} args
  * @param {object} args.standings — output of computeStandings(...)
- * @param {Array}  args.matches   — all matches (need stage + id + kickoffAt)
- * @param {object} args.predictionsByMatchForMe — { dbMatchId: { homeScore, awayScore } }
+ * @param {Array}  args.matches   — all matches with stage, id, kickoffAt,
+ *                                  status, homeScore, awayScore (real
+ *                                  results, populated by the cron).
+ *
+ * Knockout matches are NOT player-predictable — this bracket is purely
+ * a visualization that fills R16+ slots from the *actual* results of
+ * earlier rounds as they finish. Before any knockout has played, only
+ * R32 has its teams filled (from the player's group-stage predictions).
  *
  * Returns the 32 bracket entries, each with:
  *   { id, stage, home, away, homeLabel, awayLabel, winner, loser,
- *     predictedScore: { homeScore, awayScore } | null,
+ *     actualScore: { homeScore, awayScore } | null,
+ *     status: 'scheduled' | 'live' | 'finished' | null,
  *     dbMatchId: string | null }
  */
-export function buildFullBracket({ standings, matches, predictionsByMatchForMe = {} }) {
+export function buildFullBracket({ standings, matches }) {
   if (!standings || !standings.groups) return [];
 
   // 1. Best-3rds (top 8) and groups.
@@ -130,8 +137,10 @@ export function buildFullBracket({ standings, matches, predictionsByMatchForMe =
   const best3rdAssignment =
     assignBest3rds(Object.keys(thirdByGroup), best3rdSlots) || {};
 
-  // 3. FIFA → DB id map.
+  // 3. FIFA → DB id map + lookup by DB id.
   const fifaToDb = buildFifaToDbMap(matches);
+  const dbMatchById = {};
+  for (const m of matches) dbMatchById[m.id] = m;
 
   // 4. Resolve matches recursively, caching.
   const resolved = {};
@@ -165,15 +174,28 @@ export function buildFullBracket({ standings, matches, predictionsByMatchForMe =
     const home = resolveSide(m.home, fifaId);
     const away = resolveSide(m.away, fifaId);
     const dbMatchId = fifaToDb[fifaId] || null;
-    const pred = dbMatchId ? predictionsByMatchForMe[dbMatchId] : null;
+    const dbMatch = dbMatchId ? dbMatchById[dbMatchId] : null;
+
+    // Winners come from REAL results once the match finishes. Until
+    // then, downstream slots stay null (we render placeholders).
     let winner = null, loser = null;
-    if (pred && home.team && away.team && pred.homeScore !== pred.awayScore) {
-      if (pred.homeScore > pred.awayScore) {
+    let actualScore = null;
+    let status = dbMatch?.status || null;
+    if (dbMatch && dbMatch.status === 'finished' &&
+        dbMatch.homeScore != null && dbMatch.awayScore != null) {
+      actualScore = { homeScore: dbMatch.homeScore, awayScore: dbMatch.awayScore };
+      // Knockout matches can't end in a tie in real life; if the API
+      // reports one, fall back to dbMatch.winner if present.
+      if (dbMatch.homeScore > dbMatch.awayScore) {
         winner = home.team; loser = away.team;
-      } else {
+      } else if (dbMatch.awayScore > dbMatch.homeScore) {
         winner = away.team; loser = home.team;
+      } else if (dbMatch.winner) {
+        winner = dbMatch.winner;
+        loser = dbMatch.winner === home.team ? away.team : home.team;
       }
     }
+
     resolved[fifaId] = {
       id: fifaId,
       stage: m.stage,
@@ -183,7 +205,8 @@ export function buildFullBracket({ standings, matches, predictionsByMatchForMe =
       awayLabel: away.label,
       winner,
       loser,
-      predictedScore: pred ? { homeScore: pred.homeScore, awayScore: pred.awayScore } : null,
+      actualScore,
+      status,
       dbMatchId
     };
     return resolved[fifaId];
@@ -191,3 +214,71 @@ export function buildFullBracket({ standings, matches, predictionsByMatchForMe =
 
   return BRACKET.map(m => resolveMatch(m.id));
 }
+
+/* ============== Column layout for the tree view ============== */
+
+/**
+ * Reshape the bracket into the column-by-column layout used by the
+ * tree visualisation (5 columns per side + center Final/3rd).
+ *
+ * Returns:
+ *   {
+ *     left:   [ col1 (16), col2 (8), col3 (4), col4 (2), col5 (1) ],
+ *     right:  [ col1 (16), col2 (8), col3 (4), col4 (2), col5 (1) ],
+ *     final:  { id, home, away, winner, ... } | null,
+ *     third:  { id, home, away, winner, ... } | null
+ *   }
+ *
+ * Each column entry is `{ team: code|null, label: string }`.
+ *
+ * The ordering within each column follows the FIFA bracket so that
+ * adjacent pairs in column N collapse into single entries at the
+ * matching mid-position in column N+1 (perfect alignment with CSS
+ * `justify-content: space-around`).
+ */
+export function buildBracketColumns(bracket) {
+  const byId = Object.fromEntries(bracket.map(m => [m.id, m]));
+
+  // R32 vertical order. Pairs adjacent matches whose winners meet in R16.
+  const LEFT_R32  = ['M74','M77','M73','M75','M83','M84','M81','M82'];
+  const RIGHT_R32 = ['M76','M78','M79','M80','M86','M88','M85','M87'];
+
+  const LEFT_R16  = ['M89','M90','M93','M94'];
+  const RIGHT_R16 = ['M91','M92','M95','M96'];
+
+  const LEFT_QF   = ['M97','M98'];
+  const RIGHT_QF  = ['M99','M100'];
+
+  const teamSlot = (code, label) => ({ team: code || null, label });
+  const winnerSlot = (mId) => teamSlot(byId[mId]?.winner, mId);
+
+  const teamsCol = (r32Ids) => {
+    const out = [];
+    for (const mId of r32Ids) {
+      const m = byId[mId];
+      out.push(teamSlot(m.home, m.homeLabel));
+      out.push(teamSlot(m.away, m.awayLabel));
+    }
+    return out;
+  };
+
+  return {
+    left: [
+      teamsCol(LEFT_R32),
+      LEFT_R32.map(winnerSlot),
+      LEFT_R16.map(winnerSlot),
+      LEFT_QF.map(winnerSlot),
+      [winnerSlot('M101')]
+    ],
+    right: [
+      teamsCol(RIGHT_R32),
+      RIGHT_R32.map(winnerSlot),
+      RIGHT_R16.map(winnerSlot),
+      RIGHT_QF.map(winnerSlot),
+      [winnerSlot('M102')]
+    ],
+    final: byId['M104'] || null,
+    third: byId['M103'] || null
+  };
+}
+
