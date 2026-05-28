@@ -185,10 +185,11 @@ export function computeStandings({ matches, teamsByGroup }) {
   }
 
   // Best-third ranking across all groups, by pts → gd → gf → alpha.
+  // Carry the group letter through so downstream code (e.g. the bracket)
+  // can map a third-placed team back to its group of origin.
   const thirds = groupKeys
-    .map(g => groups[g][2])
-    .filter(Boolean)
-    .map(row => ({ ...row }));
+    .map(g => groups[g][2] ? { ...groups[g][2], group: g } : null)
+    .filter(Boolean);
 
   thirds.sort((a, b) => {
     if (b.pts !== a.pts) return b.pts - a.pts;

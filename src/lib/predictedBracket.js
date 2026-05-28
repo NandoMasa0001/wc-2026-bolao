@@ -58,24 +58,47 @@ const BRACKET = [
 
 /* ============== Best-3rd assignment ============== */
 
+/**
+ * Best-effort assignment of best-3rd groups to R32 slots.
+ *
+ * Tries every combination via backtracking and returns the one that
+ * fills the most slots. If we have fewer groups than slots (e.g. the
+ * player hasn't fully predicted the group stage yet), we leave the
+ * unfillable slots empty rather than refusing to assign anything.
+ */
 function assignBest3rds(groupsAvailable, slots) {
-  if (groupsAvailable.length !== slots.length) return null;
-  const result = {};
+  if (groupsAvailable.length === 0) return {};
+
+  let bestAssignment = {};
+  let bestCount = 0;
+  const current = {};
   const used = new Set();
-  function go(i) {
-    if (i === slots.length) return true;
-    const slot = slots[i];
+
+  function go(slotIdx, assignedCount) {
+    if (assignedCount > bestCount) {
+      bestAssignment = { ...current };
+      bestCount = assignedCount;
+    }
+    if (slotIdx === slots.length) return;
+
+    const slot = slots[slotIdx];
+
+    // Option A: assign each compatible unused group to this slot.
     for (const g of groupsAvailable) {
       if (used.has(g) || !slot.allowed.has(g)) continue;
-      result[slot.id] = g;
+      current[slot.id] = g;
       used.add(g);
-      if (go(i + 1)) return true;
-      delete result[slot.id];
+      go(slotIdx + 1, assignedCount + 1);
+      delete current[slot.id];
       used.delete(g);
     }
-    return false;
+
+    // Option B: skip this slot (leave it empty) and try the next.
+    go(slotIdx + 1, assignedCount);
   }
-  return go(0) ? result : null;
+
+  go(0, 0);
+  return bestAssignment;
 }
 
 /* ============== FIFA ↔ DB id map ============== */
