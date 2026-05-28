@@ -8,6 +8,7 @@ import Modal from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { computeStandings, predictedMatchesFromPlayer } from '../lib/standings.js';
+import { buildPredictedR32 } from '../lib/predictedBracket.js';
 import './PredictionsPage.css';
 
 const TABS = [
@@ -207,6 +208,10 @@ function AdvancementTab({ groupMatches, teamsByCode, teamsByGroup, predictions, 
         </div>
       </Card>
 
+      <Card>
+        <PredictedBracket standings={standings} teamsByCode={teamsByCode} />
+      </Card>
+
       <Modal
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
@@ -234,6 +239,49 @@ function AdvancementTab({ groupMatches, teamsByCode, teamsByGroup, predictions, 
         </div>
       </Modal>
     </div>
+  );
+}
+
+/* ====================================================================== */
+/* Predicted R32 bracket                                                  */
+/* ====================================================================== */
+
+function PredictedBracket({ standings, teamsByCode }) {
+  const pairings = useMemo(() => buildPredictedR32(standings), [standings]);
+
+  if (!pairings.length) {
+    return (
+      <p className="muted">
+        O preview do mata-mata aparece aqui quando você palpitar todos os jogos da fase de grupos.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <h3 className="pred-section-title">Mata-mata previsto — Round of 32</h3>
+      <p className="muted">
+        Os 16 confrontos do <strong>bracket oficial da FIFA</strong>, preenchidos com as seleções que você palpitou pra passar.
+        <br />
+        Legenda: <strong>1A</strong> = líder do grupo A · <strong>2B</strong> = vice do B · <strong>3C</strong> = melhor 3º entre as classificadas (vindo do grupo C).
+      </p>
+      <ol className="bracket-list">
+        {pairings.map((p) => (
+          <li key={p.id} className="bracket-match">
+            <span className="bracket-match__num">{p.label}</span>
+            <div className="bracket-match__side">
+              <span className="bracket-match__seed">{p.labelHome}</span>
+              <TeamChip team={teamsByCode[p.home]} size="sm" showCode placeholder={!p.home ? '?' : undefined} />
+            </div>
+            <span className="bracket-match__vs">vs</span>
+            <div className="bracket-match__side bracket-match__side--right">
+              <TeamChip team={teamsByCode[p.away]} size="sm" showCode placeholder={!p.away ? '?' : undefined} />
+              <span className="bracket-match__seed">{p.labelAway}</span>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </>
   );
 }
 
