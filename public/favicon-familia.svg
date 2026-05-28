@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Palm-green background (Brazil green) instead of the Ateneo blue -->
+  <rect width="64" height="64" rx="12" fill="#336F1B"/>
+
+  <!-- Trophy left handle -->
+  <path d="M18 22 C11 22, 9 28, 12 33 C13 35, 16 35, 18 33"
+        stroke="#FDD301" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- Trophy right handle -->
+  <path d="M46 22 C53 22, 55 28, 52 33 C51 35, 48 35, 46 33"
+        stroke="#FDD301" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+  <!-- Cup body -->
+  <path d="M18 14 H46 V32 C46 40, 40 44, 32 44 C24 44, 18 40, 18 32 Z" fill="#FDD301"/>
+  <!-- Rim accent -->
+  <rect x="18" y="14" width="28" height="3" fill="#E4BD00"/>
+
+  <!-- Stem -->
+  <rect x="28" y="44" width="8" height="6" fill="#FDD301"/>
+
+  <!-- Base -->
+  <rect x="18" y="50" width="28" height="5" rx="1.5" fill="#FDD301"/>
+  <rect x="18" y="50" width="28" height="1.5" fill="#E4BD00"/>
+
+  <!-- Tiny heart at top to differentiate (family vibe) -->
+  <path d="M32 10 C30.5 8, 28 8.5, 28 11 C28 12.5, 32 14, 32 14 C32 14, 36 12.5, 36 11 C36 8.5, 33.5 8, 32 10 Z" fill="#D8131A"/>
+</svg>
