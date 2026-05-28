@@ -111,7 +111,7 @@
 .bracket-half {
   display: flex;
   align-items: stretch;
-  min-height: 480px;
+  min-height: 400px;
 }
 
 .bracket-half--right {
@@ -132,7 +132,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 26px;
+  height: 22px;
   font-size: var(--fs-tiny);
   font-weight: var(--fw-semibold);
 }
@@ -156,8 +156,8 @@
 
 .bracket-row__empty {
   display: inline-block;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--c-mist);
   opacity: 0.5;
