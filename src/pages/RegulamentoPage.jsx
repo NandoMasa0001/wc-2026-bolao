@@ -222,8 +222,13 @@ export default function RegulamentoPage() {
       <Card className="reg-card">
         <h3 className="reg-h">6. Quando os palpites travam</h3>
         <ul className="reg-ul">
-          <li><strong>Palpite de placar</strong> de cada jogo trava no apito inicial daquela partida (ou quando o status muda de "agendado" para "ao vivo").</li>
-          <li><strong>Todos os palpites longos</strong> (classificação, finalistas, prêmios, zebra, todas as extras) travam <strong>na estreia do mundial — 11/jun/2026</strong>. Antes disso pode mexer à vontade.</li>
+          <li><strong>Tudo trava de uma vez</strong> no apito inicial do <strong>primeiro jogo</strong> do mundial — 11/jun/2026. Isso inclui:
+            <ul className="reg-ul">
+              <li>Os 72 placares da fase de grupos (mesmo que aquele jogo específico só seja jogado dias depois)</li>
+              <li>Classificação, finalistas, prêmios, zebra, todas as apostas extras</li>
+            </ul>
+          </li>
+          <li>Depois da trava, ninguém pode mais mexer em nada. Mas <strong>todo mundo pode ver os palpites dos outros</strong> (dropdown na página de Jogos).</li>
           <li><strong>Votação da zebra/decepção</strong> só é permitida quando o admin abrir, depois da final.</li>
         </ul>
         <p className="muted reg-foot">

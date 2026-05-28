@@ -91,6 +91,8 @@ export default function MatchCard({
   awayTeam,
   prediction,
   multipliers,
+  tournamentStartsAt,
+  viewOnly = false,
   draft,         // { homeScore, awayScore } | undefined
   onSave,
   onDraftChange  // (matchId, { homeScore, awayScore } | null) -> void
@@ -130,11 +132,15 @@ export default function MatchCard({
   const setHomeAndReport = (n) => { setHome(n); reportDraft(n, away); };
   const setAwayAndReport = (n) => { setAway(n); reportDraft(home, n); };
 
-  const kickoffAt = new Date(match.kickoffAt);
-  const isPastKickoff = kickoffAt.getTime() <= Date.now();
-  const locked = match.status !== 'scheduled' || isPastKickoff || isKnockoutPlaceholder;
+  // Single tournament-wide lock: everything (group predictions included)
+  // locks at the moment the World Cup starts (first kickoff). After that,
+  // even still-scheduled matches can't have their predictions changed.
+  const tournamentStarted = tournamentStartsAt
+    ? new Date(tournamentStartsAt).getTime() <= Date.now()
+    : false;
   const isLive = match.status === 'live';
   const isFinished = match.status === 'finished';
+  const locked = viewOnly || tournamentStarted || match.status !== 'scheduled' || isKnockoutPlaceholder;
   const hasPrediction = !!prediction;
 
   const countdown = useCountdown(match.kickoffAt);
@@ -177,7 +183,7 @@ export default function MatchCard({
           )}
           {isLive && <Pill variant="live">Ao vivo</Pill>}
           {locked && isLive && <Pill variant="locked">Palpites travados</Pill>}
-          {locked && !isLive && !isFinished && <Pill variant="locked">Travado</Pill>}
+          {locked && !isLive && !isFinished && !viewOnly && <Pill variant="locked">Travado</Pill>}
           {isFinished && hasPrediction && (
             <Pill variant="points">+{earnedPoints}</Pill>
           )}
@@ -290,9 +296,9 @@ export default function MatchCard({
               {!isFinished && !locked && (
                 <Button variant="secondary" onClick={() => setEditing(true)}>Editar</Button>
               )}
-              {!isFinished && locked && (
+              {!isFinished && locked && !viewOnly && (
                 <span className="match-card__locked-hint muted">
-                  Travado no apito inicial
+                  Travado
                 </span>
               )}
             </div>

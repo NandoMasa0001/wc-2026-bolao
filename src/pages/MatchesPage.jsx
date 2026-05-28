@@ -38,13 +38,29 @@ function dayKey(iso) {
 
 export default function MatchesPage() {
   const {
-    matches, teamsByCode, predictionsByMatchForMe,
-    config, savePrediction
+    matches, teamsByCode, predictionsByMatchForMe, predictionsByPlayer,
+    players, me, config, savePrediction
   } = useData();
   const { show } = useToast();
 
   const [filter, setFilter] = useState('future');
   const [predFilter, setPredFilter] = useState('all');
+  const [viewingPlayerId, setViewingPlayerId] = useState(null); // null = me
+
+  const tournamentStarted = config?.tournamentStartsAt
+    ? new Date(config.tournamentStartsAt).getTime() <= Date.now()
+    : false;
+
+  // After the tournament starts, anyone can browse anyone else's picks.
+  // Before then, you only see your own (to prevent cola).
+  const viewingMyPicks = !viewingPlayerId || viewingPlayerId === me?.id;
+  const shownPredictions = viewingMyPicks
+    ? predictionsByMatchForMe
+    : (predictionsByPlayer[viewingPlayerId] || {});
+
+  const otherPlayers = (players || [])
+    .filter(p => p.id !== me?.id)
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   // Drafts: { [matchId]: { homeScore, awayScore } }. Picks the user has
   // touched but not yet committed via per-card or bulk save.
   const [drafts, setDrafts] = useState({});
@@ -66,7 +82,7 @@ export default function MatchesPage() {
     const primary   = FILTERS.find(f => f.key === filter)?.match     || (() => true);
     const secondary = PRED_FILTERS.find(f => f.key === predFilter)?.match || (() => true);
     const arr = matches.filter(m =>
-      primary(m) && secondary(m, predictionsByMatchForMe)
+      primary(m) && secondary(m, shownPredictions)
     );
     const rank = (m) => m.status === 'live' ? 0 : m.status === 'scheduled' ? 1 : 2;
     return [...arr].sort((a, b) => {
@@ -76,7 +92,7 @@ export default function MatchesPage() {
       const tb = new Date(b.kickoffAt).getTime();
       return a.status === 'finished' ? tb - ta : ta - tb;
     });
-  }, [matches, filter, predFilter, predictionsByMatchForMe]);
+  }, [matches, filter, predFilter, shownPredictions]);
 
   const groups = useMemo(() => {
     const map = new Map();
@@ -121,6 +137,22 @@ export default function MatchesPage() {
           Ver consenso →
         </Link>
       </div>
+
+      {tournamentStarted && otherPlayers.length > 0 && (
+        <div className="matches-viewing">
+          <label htmlFor="view-as">Ver palpites de:</label>
+          <select
+            id="view-as"
+            value={viewingPlayerId || ''}
+            onChange={(e) => setViewingPlayerId(e.target.value || null)}
+          >
+            <option value="">Eu ({me?.name})</option>
+            {otherPlayers.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="matches-filter" role="group" aria-label="Filtrar por fase">
         {FILTERS.map(({ key, label }) => (
           <button
@@ -174,11 +206,13 @@ export default function MatchesPage() {
                     match={match}
                     homeTeam={teamsByCode[match.homeTeam]}
                     awayTeam={teamsByCode[match.awayTeam]}
-                    prediction={predictionsByMatchForMe[match.id]}
+                    prediction={shownPredictions[match.id]}
                     multipliers={config?.roundMultipliers}
-                    draft={drafts[match.id]}
-                    onDraftChange={onDraftChange}
-                    onSave={handleSave(match)}
+                    tournamentStartsAt={config?.tournamentStartsAt}
+                    viewOnly={!viewingMyPicks}
+                    draft={viewingMyPicks ? drafts[match.id] : undefined}
+                    onDraftChange={viewingMyPicks ? onDraftChange : undefined}
+                    onSave={viewingMyPicks ? handleSave(match) : undefined}
                   />
                 ))}
               </div>
