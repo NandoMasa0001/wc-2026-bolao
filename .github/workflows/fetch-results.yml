@@ -2,7 +2,6 @@ name: fetch-results
 
 on:
   schedule:
-    # every 10 minutes — fine for both API free tiers
     - cron: '*/10 * * * *'
   workflow_dispatch:
 
@@ -13,25 +12,29 @@ concurrency:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          # Supabase v2 RealtimeClient requires native WebSocket support,
-          # which only landed in Node 22.
           node-version: '22'
           cache: 'npm'
 
       - name: Install
         run: npm ci
 
-      - name: Run fetch-results
+      - name: Run fetch-results across all leagues
         env:
-          FOOTBALL_API_KEY:      ${{ secrets.FOOTBALL_API_KEY }}
-          SUPABASE_URL:          ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY:  ${{ secrets.SUPABASE_SERVICE_KEY }}
-          ODDS_API_KEY:          ${{ secrets.ODDS_API_KEY }}
+          # Shared external APIs.
+          FOOTBALL_API_KEY:               ${{ secrets.FOOTBALL_API_KEY }}
+          ODDS_API_KEY:                   ${{ secrets.ODDS_API_KEY }}
+
+          # Per-league Supabase env. New leagues need their pair of secrets
+          # added below — names must match `scripts/leagues.config.json`.
+          SUPABASE_URL_TRUPE:             ${{ secrets.SUPABASE_URL_TRUPE }}
+          SUPABASE_SERVICE_KEY_TRUPE:     ${{ secrets.SUPABASE_SERVICE_KEY_TRUPE }}
+          SUPABASE_URL_FAMILIA:           ${{ secrets.SUPABASE_URL_FAMILIA }}
+          SUPABASE_SERVICE_KEY_FAMILIA:   ${{ secrets.SUPABASE_SERVICE_KEY_FAMILIA }}
         run: npm run fetch-results

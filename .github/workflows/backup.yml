@@ -12,7 +12,7 @@ concurrency:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -25,15 +25,17 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Run backup
+      - name: Run backup across all leagues
         env:
-          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_URL_TRUPE:           ${{ secrets.SUPABASE_URL_TRUPE }}
+          SUPABASE_SERVICE_KEY_TRUPE:   ${{ secrets.SUPABASE_SERVICE_KEY_TRUPE }}
+          SUPABASE_URL_FAMILIA:         ${{ secrets.SUPABASE_URL_FAMILIA }}
+          SUPABASE_SERVICE_KEY_FAMILIA: ${{ secrets.SUPABASE_SERVICE_KEY_FAMILIA }}
         run: node scripts/backup.mjs
 
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: bolao-backup-${{ github.run_id }}
+          name: bolao-backups-${{ github.run_id }}
           path: backup-*.json
           retention-days: 90

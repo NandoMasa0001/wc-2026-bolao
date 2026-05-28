@@ -1,28 +1,43 @@
 #!/usr/bin/env node
 /**
- * backup.mjs — daily JSON dump of every Supabase table.
+ * backup.mjs — daily JSON dump of every Supabase table for every league
+ * listed in `leagues.config.json`. One file per league.
  *
- * Run by .github/workflows/backup.yml every day at 06:00 UTC.
- * The resulting backup-YYYY-MM-DD.json gets uploaded as a workflow
- * artifact with 90-day retention.
- *
- * To restore (quick & dirty): read the JSON and upsert each table back
- * via the service role key.
+ * Triggered by .github/workflows/backup.yml.
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
-const { SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
+function loadLeagues() {
+  let configList;
+  try {
+    const raw = readFileSync(new URL('./leagues.config.json', import.meta.url), 'utf8');
+    configList = JSON.parse(raw);
+  } catch {
+    configList = null;
+  }
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY');
-  process.exit(1);
+  const leagues = [];
+  if (Array.isArray(configList)) {
+    for (const entry of configList) {
+      const url = process.env[entry.urlEnv];
+      const key = process.env[entry.keyEnv];
+      if (!url || !key) {
+        console.warn(`Skipping "${entry.name}" — missing ${!url ? entry.urlEnv : entry.keyEnv}`);
+        continue;
+      }
+      leagues.push({ name: entry.name, url, key });
+    }
+  }
+  if (leagues.length === 0 && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
+    leagues.push({ name: 'default', url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_KEY });
+  }
+  if (leagues.length === 0) {
+    throw new Error('No leagues configured for backup.');
+  }
+  return leagues;
 }
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false }
-});
 
 const TABLES = [
   'config',
@@ -38,23 +53,45 @@ const TABLES = [
   'extra_predictions'
 ];
 
-const dump = {
-  dumpedAt: new Date().toISOString(),
-  schemaVersion: 5, // bump when migrations change shape
-  tables: {}
-};
+async function dumpLeague(league) {
+  console.log(`[${league.name}] starting backup…`);
+  const supabase = createClient(league.url, league.key, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
 
-for (const t of TABLES) {
-  const { data, error } = await supabase.from(t).select('*');
-  if (error) {
-    console.error(`${t}: ${error.message}`);
-    continue;
+  const dump = {
+    league: league.name,
+    dumpedAt: new Date().toISOString(),
+    schemaVersion: 6,
+    tables: {}
+  };
+
+  for (const t of TABLES) {
+    const { data, error } = await supabase.from(t).select('*');
+    if (error) {
+      console.error(`[${league.name}] ${t}: ${error.message}`);
+      continue;
+    }
+    dump.tables[t] = data;
+    console.log(`[${league.name}] ${t}: ${data.length} rows`);
   }
-  dump.tables[t] = data;
-  console.log(`${t}: ${data.length} rows`);
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const file = `backup-${league.name}-${stamp}.json`;
+  writeFileSync(file, JSON.stringify(dump, null, 2));
+  console.log(`[${league.name}] wrote ${file}`);
 }
 
-const stamp = new Date().toISOString().slice(0, 10);
-const file = `backup-${stamp}.json`;
-writeFileSync(file, JSON.stringify(dump, null, 2));
-console.log(`Wrote ${file}`);
+async function main() {
+  const leagues = loadLeagues();
+  console.log(`Backing up ${leagues.length} league(s): ${leagues.map(l => l.name).join(', ')}`);
+  for (const league of leagues) {
+    await dumpLeague(league);
+  }
+  console.log('All backups written.');
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

@@ -1,19 +1,26 @@
 #!/usr/bin/env node
 /**
- * fetch-results.mjs — run by the GitHub Actions cron every 10 minutes
- * against Supabase Postgres.
+ * fetch-results.mjs — run every 10 min by GitHub Actions.
  *
- * 1. Pull all WC matches from football-data.org.
- * 2. Upsert each into `matches`: status, scores, knockout winners.
- * 3. (Optional) Pull H2H + outright odds from the-odds-api, attach to
- *    matches and write championship outrights into config.tournament_odds.
- * 4. Score every prediction with `scoring.js`.
- * 5. Once the group stage is fully finished, score advancement_predictions.
- * 6. Once both finalists are known, score finals_predictions.
- * 7. Recompute awards + poll buckets from config.results each run.
- * 8. Recompute every player's totals.
+ * MULTI-LEAGUE: reads `scripts/leagues.config.json`, runs the cron for
+ * every configured league in one invocation. External API calls
+ * (football-data.org + the-odds-api) happen ONCE; results get written
+ * to all leagues' databases.
+ *
+ * PRIMARY → SECONDARY sync: admin-entered tournament results
+ * (`config.results` — best player, top scorer, dark horse, etc.) live
+ * in the primary league. Each cron run copies them to the secondary
+ * leagues so all bolões share the same official answers.
+ *
+ * Env:
+ *   FOOTBALL_API_KEY        required
+ *   ODDS_API_KEY            optional (boost stays at 1× without it)
+ *   SUPABASE_URL_{NAME}     per league listed in leagues.config.json
+ *   SUPABASE_SERVICE_KEY_{NAME}
+ *   SCORING_ONLY=1          skip API fetches, only run scoring
  */
 
+import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { fetchTeamsAndMatches } from '../src/lib/footballApi.js';
 import { fetchChampionOdds } from '../src/lib/oddsApi.js';
@@ -32,99 +39,143 @@ import { computeStandings } from '../src/lib/standings.js';
 
 const {
   FOOTBALL_API_KEY,
-  SUPABASE_URL,
-  SUPABASE_SERVICE_KEY,
   ODDS_API_KEY,
   COMPETITION = 'WC',
-  // Skip the football-data.org + the-odds-api fetches and only run
-  // the scoring pass against the current DB state. Useful for testing
-  // (set a match to finished via /admin, then trigger this) and for
-  // re-scoring after a manual edit without waiting for the next cron.
   SCORING_ONLY
 } = process.env;
+
 const scoringOnly = SCORING_ONLY === '1' || SCORING_ONLY === 'true';
 
-function need(name, v) {
-  if (!v) throw new Error(`Missing env: ${name}`);
-  return v;
+/* -------------------------------------------------------------------- */
+/* Load the list of leagues + their per-league env vars.                */
+/* -------------------------------------------------------------------- */
+
+function loadLeagues() {
+  // Try the JSON config first.
+  let configList;
+  try {
+    const raw = readFileSync(new URL('./leagues.config.json', import.meta.url), 'utf8');
+    configList = JSON.parse(raw);
+  } catch {
+    configList = null;
+  }
+
+  const leagues = [];
+  if (Array.isArray(configList) && configList.length > 0) {
+    for (const entry of configList) {
+      const url = process.env[entry.urlEnv];
+      const key = process.env[entry.keyEnv];
+      if (!url || !key) {
+        console.warn(
+          `[league "${entry.name}"] skipping — missing ${!url ? entry.urlEnv : entry.keyEnv}`
+        );
+        continue;
+      }
+      leagues.push({
+        name: entry.name,
+        url,
+        key,
+        isPrimary: !!entry.isPrimary
+      });
+    }
+  }
+
+  // Backward compat: old single-league env scheme.
+  if (leagues.length === 0 && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
+    leagues.push({
+      name: 'default',
+      url: process.env.SUPABASE_URL,
+      key: process.env.SUPABASE_SERVICE_KEY,
+      isPrimary: true
+    });
+  }
+
+  if (leagues.length === 0) {
+    throw new Error(
+      'No leagues configured. Either populate SUPABASE_URL_{NAME} env vars matching leagues.config.json, or fall back to single-league SUPABASE_URL/SUPABASE_SERVICE_KEY.'
+    );
+  }
+  return leagues;
 }
 
-async function main() {
-  need('FOOTBALL_API_KEY', FOOTBALL_API_KEY);
-  need('SUPABASE_URL', SUPABASE_URL);
-  need('SUPABASE_SERVICE_KEY', SUPABASE_SERVICE_KEY);
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+function makeClient(url, key) {
+  return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
+}
 
-  // ---------------- 1. Read config ----------------
+function byId(rows) {
+  const m = {};
+  for (const r of rows || []) m[r.player_id] = r;
+  return m;
+}
+
+async function flushUpdates(supabase, table, rows, onConflict, name) {
+  if (rows.length === 0) return;
+  for (let i = 0; i < rows.length; i += 100) {
+    const chunk = rows.slice(i, i + 100);
+    const { error } = await supabase.from(table).upsert(chunk, { onConflict });
+    if (error) console.error(`[${name}] flush ${table}:`, error.message);
+  }
+}
+
+/* -------------------------------------------------------------------- */
+/* Process one league's database.                                       */
+/* -------------------------------------------------------------------- */
+
+async function runForLeague({ league, apiMatches, championOdds, primaryResults }) {
+  const tag = `[${league.name}]`;
+  console.log(`${tag} processing…`);
+
+  const supabase = makeClient(league.url, league.key);
+
+  // ---- Config row ----
   const { data: cfgRow, error: cfgErr } = await supabase
     .from('config')
     .select('*')
     .eq('id', 'tournament')
     .maybeSingle();
-  if (cfgErr) throw cfgErr;
-  if (!cfgRow) throw new Error('config row missing — run seed.mjs first.');
+  if (cfgErr) throw new Error(`${tag} config: ${cfgErr.message}`);
+  if (!cfgRow) {
+    console.warn(`${tag} skipping — config.tournament missing (seed first).`);
+    return null;
+  }
   const multipliers = cfgRow.round_multipliers || DEFAULT_ROUND_MULTIPLIERS;
 
-  // ---------------- 2. Fresh matches ----------------
-  let apiMatches = [];
-  if (scoringOnly) {
-    console.log('SCORING_ONLY=1 — skipping football-data.org fetch (re-scoring current DB state).');
-  } else {
-    console.log('Fetching matches from football-data.org…');
-    const result = await fetchTeamsAndMatches({
-      apiKey: FOOTBALL_API_KEY,
-      competition: COMPETITION
-    });
-    apiMatches = result.matches;
-    console.log(`  ${apiMatches.length} matches returned.`);
+  // ---- Sync admin-entered results from primary (if any) ----
+  if (primaryResults && league.isPrimary === false) {
+    const merged = { ...(cfgRow.results || {}), ...primaryResults };
+    await supabase.from('config').update({ results: merged }).eq('id', 'tournament');
+    cfgRow.results = merged;
+    console.log(`${tag} synced config.results from primary league.`);
   }
 
-  // ---------------- 2b. Championship outright odds (optional) ----------------
-  // Per-match (H2H) odds are NOT used by scoring — the boost only applies
-  // to tournament-long bets via championship outrights. We only fetch the
-  // outrights, and we lock the snapshot the moment the tournament starts.
-  let championOdds = null;
+  // ---- Sync championship odds from shared fetch ----
   const tournamentStartsAt = cfgRow.tournament_starts_at ? new Date(cfgRow.tournament_starts_at) : null;
   const tournamentStarted = tournamentStartsAt && tournamentStartsAt.getTime() <= Date.now();
-
-  if (scoringOnly) {
-    console.log('SCORING_ONLY=1 — skipping odds fetch.');
+  if (!scoringOnly && !tournamentStarted && championOdds && Object.keys(championOdds).length > 0) {
+    // Translate championOdds (team names from the-odds-api) into team codes via this league's teams table
+    const { data: teamRows } = await supabase.from('teams').select('code, name');
+    const nameToCode = {};
+    for (const r of teamRows || []) {
+      if (r.name) nameToCode[r.name.toLowerCase()] = r.code;
+    }
+    const byCode = {};
+    for (const [name, prob] of Object.entries(championOdds)) {
+      const code = nameToCode[name.toLowerCase()];
+      if (code) byCode[code] = prob;
+    }
+    if (Object.keys(byCode).length > 0) {
+      await supabase.from('config').update({ tournament_odds: byCode }).eq('id', 'tournament');
+      cfgRow.tournament_odds = byCode;
+    }
   } else if (tournamentStarted) {
-    console.log('Tournament has started — odds are locked (skipping the-odds-api fetch).');
-  } else if (ODDS_API_KEY) {
-    try {
-      console.log('Fetching championship outright odds…');
-      const championByName = await fetchChampionOdds({ apiKey: ODDS_API_KEY });
-      const { data: teamRows } = await supabase.from('teams').select('code, name');
-      const nameToCode = {};
-      for (const r of teamRows || []) {
-        if (r.name) nameToCode[r.name.toLowerCase()] = r.code;
-      }
-      const byCode = {};
-      for (const [name, prob] of Object.entries(championByName)) {
-        const code = nameToCode[name.toLowerCase()];
-        if (code) byCode[code] = prob;
-      }
-      if (Object.keys(byCode).length > 0) championOdds = byCode;
-      console.log(`  outright odds matched for ${Object.keys(byCode).length} teams`);
-    } catch (err) {
-      console.warn('Champion-odds fetch failed (continuing without):', err.message);
-    }
-    if (championOdds) {
-      await supabase
-        .from('config')
-        .update({ tournament_odds: championOdds })
-        .eq('id', 'tournament');
-    }
+    console.log(`${tag} odds locked (tournament started).`);
   }
 
-  // ---------------- 3. Upsert matches ----------------
-  if (!scoringOnly) {
-    console.log('Upserting matches…');
-    const matchRows = apiMatches.map((m) => ({
+  // ---- Upsert matches ----
+  if (!scoringOnly && apiMatches.length > 0) {
+    const rows = apiMatches.map((m) => ({
       id: m.id,
       api_id: m.apiId ?? null,
       stage: m.stage,
@@ -140,15 +191,14 @@ async function main() {
       away_score: m.awayScore,
       winner: m.winner
     }));
-    for (let i = 0; i < matchRows.length; i += 100) {
-      const chunk = matchRows.slice(i, i + 100);
+    for (let i = 0; i < rows.length; i += 100) {
+      const chunk = rows.slice(i, i + 100);
       const { error } = await supabase.from('matches').upsert(chunk, { onConflict: 'id' });
-      if (error) throw error;
+      if (error) throw new Error(`${tag} matches upsert: ${error.message}`);
     }
   }
 
-  // ---------------- 4. Score predictions ----------------
-  console.log('Scoring predictions…');
+  // ---- Score predictions (placar) ----
   const { data: predRows } = await supabase.from('predictions').select('*');
   const { data: matchRowsAll } = await supabase.from('matches').select('*');
   const matchesById = Object.fromEntries(
@@ -156,12 +206,11 @@ async function main() {
       ...m,
       stage: m.stage,
       homeScore: m.home_score,
-      awayScore: m.away_score,
-      odds: m.odds
+      awayScore: m.away_score
     }])
   );
 
-  const playerAgg = new Map(); // playerId -> { matches, exactScores, predictionsMade }
+  const playerAgg = new Map();
   const predUpdates = [];
 
   for (const pr of predRows || []) {
@@ -172,9 +221,7 @@ async function main() {
     if (match.status === 'finished') {
       points = matchPoints(predObj, match, match.stage, multipliers);
     }
-    if (points !== pr.points) {
-      predUpdates.push({ ...pr, points });
-    }
+    if (points !== pr.points) predUpdates.push({ ...pr, points });
     if (!playerAgg.has(pr.player_id)) {
       playerAgg.set(pr.player_id, { matches: 0, exactScores: 0, predictionsMade: 0 });
     }
@@ -186,24 +233,15 @@ async function main() {
     }
   }
 
-  if (predUpdates.length > 0) {
-    for (let i = 0; i < predUpdates.length; i += 100) {
-      const chunk = predUpdates.slice(i, i + 100);
-      const { error } = await supabase.from('predictions').upsert(chunk, {
-        onConflict: 'player_id,match_id'
-      });
-      if (error) throw error;
-    }
-  }
+  await flushUpdates(supabase, 'predictions', predUpdates, 'player_id,match_id', league.name);
 
-  // ---------------- 5a. Advancement scoring ----------------
+  // ---- Compute advancing-32 + finalists ----
   const groupMatches = (matchRowsAll || []).filter(m => m.stage === 'group');
   const allGroupFinished = groupMatches.length > 0 &&
     groupMatches.every(m => m.status === 'finished');
 
   let officialAdvancing = null;
   if (allGroupFinished) {
-    console.log('Group stage complete — computing official advancing 32…');
     const { data: teamRows } = await supabase.from('teams').select('*');
     const teamsByGroup = {};
     for (const t of teamRows || []) {
@@ -213,30 +251,21 @@ async function main() {
     }
     const standings = computeStandings({
       matches: groupMatches.map((m) => ({
-        ...m,
-        stage: m.stage,
-        group: m.group_letter,
-        homeTeam: m.home_team,
-        awayTeam: m.away_team,
-        homeScore: m.home_score,
-        awayScore: m.away_score
+        ...m, stage: m.stage, group: m.group_letter,
+        homeTeam: m.home_team, awayTeam: m.away_team,
+        homeScore: m.home_score, awayScore: m.away_score
       })),
       teamsByGroup
     });
     officialAdvancing = Array.from(standings.advancing);
   }
 
-  // 5b. Finalists
   const finalMatch = (matchRowsAll || []).find(m => m.stage === 'final');
   const officialFinalists = finalMatch && finalMatch.home_team && finalMatch.away_team
     ? [finalMatch.home_team, finalMatch.away_team]
     : null;
 
-  // Per-team boost from championship outrights.
-  const tournamentOdds = cfgRow.tournament_odds || championOdds || {};
-  const teamBoosts = rankBoostsFromChampionOdds(tournamentOdds);
-
-  // 5c. Awards + poll from config.results
+  const teamBoosts = rankBoostsFromChampionOdds(cfgRow.tournament_odds || {});
   const results = cfgRow.results || {};
   const awardsActual = {
     bestPlayer: results.bestPlayer,
@@ -249,8 +278,7 @@ async function main() {
     disappointment: results.disappointment
   };
 
-  // ---------------- 6. Tournament-long scoring ----------------
-  console.log('Scoring tournament-long predictions…');
+  // ---- Score tournament-long buckets ----
   const [{ data: advRows }, { data: finRows }, { data: awdRows }, { data: pollRows }, { data: extraRows }, { data: playerRows }] =
     await Promise.all([
       supabase.from('advancement_predictions').select('*'),
@@ -261,9 +289,9 @@ async function main() {
       supabase.from('players').select('*')
     ]);
 
-  const advByPlayer  = byId(advRows);
-  const finByPlayer  = byId(finRows);
-  const awdByPlayer  = byId(awdRows);
+  const advByPlayer = byId(advRows);
+  const finByPlayer = byId(finRows);
+  const awdByPlayer = byId(awdRows);
   const pollByPlayer = byId(pollRows);
   const extraByPlayer = byId(extraRows);
 
@@ -278,7 +306,7 @@ async function main() {
     const pid = player.id;
     const matchAgg = playerAgg.get(pid) || { matches: 0, exactScores: 0, predictionsMade: 0 };
 
-    // Advancement (flat — no boost)
+    // Advancement
     let advancement = 0;
     if (officialAdvancing && advByPlayer[pid]?.teams) {
       advancement = scoreAdvancement(advByPlayer[pid].teams, officialAdvancing);
@@ -318,44 +346,41 @@ async function main() {
     // Poll
     let poll = 0;
     if (pollByPlayer[pid]) {
-      const camelPred = {
-        darkHorse: pollByPlayer[pid].dark_horse,
-        disappointment: pollByPlayer[pid].disappointment
-      };
-      poll = scorePoll(camelPred, pollActual);
+      poll = scorePoll(
+        { darkHorse: pollByPlayer[pid].dark_horse, disappointment: pollByPlayer[pid].disappointment },
+        pollActual
+      );
       if (pollByPlayer[pid].points !== poll) {
         pollUpdates.push({ ...pollByPlayer[pid], points: poll });
       }
     }
 
-    // Extras (8 side bets)
+    // Extras
     let extras = 0;
     if (extraByPlayer[pid]) {
       const er = extraByPlayer[pid];
       const camelPred = {
-        champion:        er.champion,
+        champion: er.champion,
         firstGoalBrazil: er.first_goal_brazil,
-        lastGoalBrazil:  er.last_goal_brazil,
-        hundredthGoal:   er.hundredth_goal,
-        totalGoalsWC:    er.total_goals_wc,
-        neymarGA:        er.neymar_ga,
-        topScorerGoals:  er.top_scorer_goals,
-        mbappeRecord:    er.mbappe_record
+        lastGoalBrazil: er.last_goal_brazil,
+        hundredthGoal: er.hundredth_goal,
+        totalGoalsWC: er.total_goals_wc,
+        neymarGA: er.neymar_ga,
+        topScorerGoals: er.top_scorer_goals,
+        mbappeRecord: er.mbappe_record
       };
       const extrasActual = {
-        champion:        results.champion,
+        champion: results.champion,
         firstGoalBrazil: results.firstGoalBrazil,
-        lastGoalBrazil:  results.lastGoalBrazil,
-        hundredthGoal:   results.hundredthGoal,
-        totalGoalsWC:    results.totalGoalsWC,
-        neymarGA:        results.neymarGA,
-        topScorerGoals:  results.topScorerGoals,
-        mbappeRecord:    results.mbappeRecord
+        lastGoalBrazil: results.lastGoalBrazil,
+        hundredthGoal: results.hundredthGoal,
+        totalGoalsWC: results.totalGoalsWC,
+        neymarGA: results.neymarGA,
+        topScorerGoals: results.topScorerGoals,
+        mbappeRecord: results.mbappeRecord
       };
       extras = scoreExtras(camelPred, extrasActual, teamBoosts);
-      if (er.points !== extras) {
-        extraUpdates.push({ ...er, points: extras });
-      }
+      if (er.points !== extras) extraUpdates.push({ ...er, points: extras });
     }
 
     const total = matchAgg.matches + advancement + finalists + awards + poll + extras;
@@ -374,38 +399,78 @@ async function main() {
     });
   }
 
-  // Flush updates (only fields touched, via upsert).
-  await flushUpdates(supabase, 'advancement_predictions', advUpdates, 'player_id');
-  await flushUpdates(supabase, 'finals_predictions',      finUpdates, 'player_id');
-  await flushUpdates(supabase, 'award_predictions',       awdUpdates, 'player_id');
-  await flushUpdates(supabase, 'poll_predictions',        pollUpdates, 'player_id');
-  await flushUpdates(supabase, 'extra_predictions',       extraUpdates, 'player_id');
+  await flushUpdates(supabase, 'advancement_predictions', advUpdates, 'player_id', league.name);
+  await flushUpdates(supabase, 'finals_predictions', finUpdates, 'player_id', league.name);
+  await flushUpdates(supabase, 'award_predictions', awdUpdates, 'player_id', league.name);
+  await flushUpdates(supabase, 'poll_predictions', pollUpdates, 'player_id', league.name);
+  await flushUpdates(supabase, 'extra_predictions', extraUpdates, 'player_id', league.name);
 
-  // Players: update each individually (only writing points + stats).
   for (const p of playerUpdates) {
     const { error } = await supabase
       .from('players')
       .update({ points: p.points, stats: p.stats })
       .eq('id', p.id);
-    if (error) console.error(`update player ${p.id}:`, error.message);
+    if (error) console.error(`${tag} update player ${p.id}:`, error.message);
   }
 
-  console.log('Done.');
+  console.log(`${tag} done (${playerUpdates.length} players scored).`);
+
+  // Return the primary league's results so secondaries can sync.
+  return league.isPrimary ? cfgRow.results : null;
 }
 
-function byId(rows) {
-  const m = {};
-  for (const r of rows || []) m[r.player_id] = r;
-  return m;
-}
+/* -------------------------------------------------------------------- */
+/* Main                                                                  */
+/* -------------------------------------------------------------------- */
 
-async function flushUpdates(supabase, table, rows, onConflict) {
-  if (rows.length === 0) return;
-  for (let i = 0; i < rows.length; i += 100) {
-    const chunk = rows.slice(i, i + 100);
-    const { error } = await supabase.from(table).upsert(chunk, { onConflict });
-    if (error) console.error(`flush ${table}:`, error.message);
+async function main() {
+  const leagues = loadLeagues();
+  console.log(`Configured leagues: ${leagues.map(l => l.name + (l.isPrimary ? '*' : '')).join(', ')}`);
+
+  // External APIs are shared across leagues — fetch ONCE.
+  let apiMatches = [];
+  let championOddsByName = null;
+
+  if (!scoringOnly) {
+    if (!FOOTBALL_API_KEY) throw new Error('Missing FOOTBALL_API_KEY');
+    console.log('Fetching matches from football-data.org…');
+    const result = await fetchTeamsAndMatches({ apiKey: FOOTBALL_API_KEY, competition: COMPETITION });
+    apiMatches = result.matches;
+    console.log(`  ${apiMatches.length} matches.`);
+
+    if (ODDS_API_KEY) {
+      try {
+        championOddsByName = await fetchChampionOdds({ apiKey: ODDS_API_KEY });
+        console.log(`  championship outright odds for ${Object.keys(championOddsByName).length} teams.`);
+      } catch (err) {
+        console.warn('Odds fetch failed (continuing):', err.message);
+      }
+    }
+  } else {
+    console.log('SCORING_ONLY — skipping API fetches.');
   }
+
+  // Process primary first to capture its config.results.
+  const primary = leagues.find(l => l.isPrimary) || leagues[0];
+  const others  = leagues.filter(l => l !== primary);
+
+  const primaryResults = await runForLeague({
+    league: primary,
+    apiMatches,
+    championOdds: championOddsByName,
+    primaryResults: null
+  });
+
+  for (const league of others) {
+    await runForLeague({
+      league,
+      apiMatches,
+      championOdds: championOddsByName,
+      primaryResults
+    });
+  }
+
+  console.log('All leagues processed.');
 }
 
 main().catch((err) => {
