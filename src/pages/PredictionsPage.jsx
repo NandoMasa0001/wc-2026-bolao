@@ -270,10 +270,6 @@ function PredictedBracket({ standings, teamsByCode, allMatches }) {
   return (
     <>
       <h3 className="pred-section-title">Mata-mata previsto</h3>
-      <p className="muted">
-        Bracket completo. As seleções da primeira coluna são as que você palpitou pra passar da fase de grupos.
-        As bolinhas vão sendo preenchidas com a bandeira do vencedor real conforme os jogos do mata-mata terminarem.
-      </p>
 
       <div className="bracket-tree">
         <div className="bracket-half bracket-half--left">
