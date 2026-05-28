@@ -4,6 +4,7 @@ import Pill from './Pill.jsx';
 import TeamChip from './TeamChip.jsx';
 import ScoreStepper from './ScoreStepper.jsx';
 import Button from './Button.jsx';
+import Modal from './Modal.jsx';
 import { baseMatchPoints, matchPoints, DEFAULT_ROUND_MULTIPLIERS } from '../lib/scoring.js';
 import './MatchCard.css';
 
@@ -92,11 +93,12 @@ export default function MatchCard({
   prediction,
   multipliers,
   tournamentStartsAt,
-  viewOnly = false,
-  draft,         // { homeScore, awayScore } | undefined
+  allPlayerPicks,   // Array<{ player, prediction }> — populated after lock
+  draft,            // { homeScore, awayScore } | undefined
   onSave,
-  onDraftChange  // (matchId, { homeScore, awayScore } | null) -> void
+  onDraftChange     // (matchId, { homeScore, awayScore } | null) -> void
 }) {
+  const [picksOpen, setPicksOpen] = useState(false);
   // Knockout matches are visualization-only — never user-predictable.
   // The bracket on /palpites shows them; predictions only happen on
   // group-stage games.
@@ -140,7 +142,7 @@ export default function MatchCard({
     : false;
   const isLive = match.status === 'live';
   const isFinished = match.status === 'finished';
-  const locked = viewOnly || tournamentStarted || match.status !== 'scheduled' || isKnockoutPlaceholder;
+  const locked = tournamentStarted || match.status !== 'scheduled' || isKnockoutPlaceholder;
   const hasPrediction = !!prediction;
 
   const countdown = useCountdown(match.kickoffAt);
@@ -183,7 +185,7 @@ export default function MatchCard({
           )}
           {isLive && <Pill variant="live">Ao vivo</Pill>}
           {locked && isLive && <Pill variant="locked">Palpites travados</Pill>}
-          {locked && !isLive && !isFinished && !viewOnly && <Pill variant="locked">Travado</Pill>}
+          {locked && !isLive && !isFinished && <Pill variant="locked">Travado</Pill>}
           {isFinished && hasPrediction && (
             <Pill variant="points">+{earnedPoints}</Pill>
           )}
@@ -296,7 +298,7 @@ export default function MatchCard({
               {!isFinished && !locked && (
                 <Button variant="secondary" onClick={() => setEditing(true)}>Editar</Button>
               )}
-              {!isFinished && locked && !viewOnly && (
+              {!isFinished && locked && (
                 <span className="match-card__locked-hint muted">
                   Travado
                 </span>
@@ -329,7 +331,74 @@ export default function MatchCard({
             <span className="muted">Sem palpite ainda.</span>
           </div>
         )}
+
+        {/* "Ver palpites dos amigos" — só após a trava global, e só se
+            houver palpites de outros pra mostrar. */}
+        {tournamentStarted && allPlayerPicks && allPlayerPicks.length > 0 && (
+          <button
+            type="button"
+            className="match-card__see-picks"
+            onClick={() => setPicksOpen(true)}
+          >
+            Ver palpites dos amigos ({allPlayerPicks.length})
+          </button>
+        )}
       </div>
+
+      <Modal
+        open={picksOpen}
+        onClose={() => setPicksOpen(false)}
+        title={`Palpites — ${homeTeam?.name || match.homePlaceholder || '?'} vs ${awayTeam?.name || match.awayPlaceholder || '?'}`}
+      >
+        <PlayerPicksTable
+          picks={allPlayerPicks || []}
+          isFinished={isFinished}
+          actualScore={isFinished ? { home: match.homeScore, away: match.awayScore } : null}
+        />
+      </Modal>
     </Card>
+  );
+}
+
+function PlayerPicksTable({ picks, isFinished, actualScore }) {
+  if (picks.length === 0) {
+    return <p className="muted">Ninguém palpitou esse jogo.</p>;
+  }
+  return (
+    <div className="picks-table-wrap">
+      {isFinished && actualScore && (
+        <p className="muted picks-table__actual">
+          Resultado real: <strong className="tabular">{actualScore.home}–{actualScore.away}</strong>
+        </p>
+      )}
+      <table className="picks-table">
+        <thead>
+          <tr>
+            <th>Jogador</th>
+            <th className="ta-c">Palpite</th>
+            {isFinished && <th className="ta-c">Pts</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {picks.map(({ player, prediction }) => {
+            const isExact = isFinished && actualScore &&
+              prediction.homeScore === actualScore.home &&
+              prediction.awayScore === actualScore.away;
+            return (
+              <tr key={player.id} className={isExact ? 'is-exact' : ''}>
+                <td>{player.name}</td>
+                <td className="ta-c tabular">
+                  {prediction.homeScore}–{prediction.awayScore}
+                  {isExact && <span title="Cravou!" aria-label="Cravou"> ✓</span>}
+                </td>
+                {isFinished && (
+                  <td className="ta-c tabular">{prediction.points || 0}</td>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

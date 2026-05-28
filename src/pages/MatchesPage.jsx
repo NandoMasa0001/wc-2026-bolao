@@ -38,29 +38,41 @@ function dayKey(iso) {
 
 export default function MatchesPage() {
   const {
-    matches, teamsByCode, predictionsByMatchForMe, predictionsByPlayer,
+    matches, teamsByCode, predictionsByMatchForMe, predictions,
     players, me, config, savePrediction
   } = useData();
   const { show } = useToast();
 
   const [filter, setFilter] = useState('future');
   const [predFilter, setPredFilter] = useState('all');
-  const [viewingPlayerId, setViewingPlayerId] = useState(null); // null = me
 
   const tournamentStarted = config?.tournamentStartsAt
     ? new Date(config.tournamentStartsAt).getTime() <= Date.now()
     : false;
 
-  // After the tournament starts, anyone can browse anyone else's picks.
-  // Before then, you only see your own (to prevent cola).
-  const viewingMyPicks = !viewingPlayerId || viewingPlayerId === me?.id;
-  const shownPredictions = viewingMyPicks
-    ? predictionsByMatchForMe
-    : (predictionsByPlayer[viewingPlayerId] || {});
-
-  const otherPlayers = (players || [])
-    .filter(p => p.id !== me?.id)
-    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  // For each match, build the list of {player, prediction} from ALL players.
+  // Only used to feed the per-card "ver palpites" modal once the tournament
+  // has started.
+  const picksByMatch = useMemo(() => {
+    if (!tournamentStarted) return {};
+    const playersById = Object.fromEntries((players || []).map(p => [p.id, p]));
+    const out = {};
+    for (const pred of Object.values(predictions || {})) {
+      const player = playersById[pred.playerId];
+      if (!player) continue;
+      if (!out[pred.matchId]) out[pred.matchId] = [];
+      out[pred.matchId].push({ player, prediction: pred });
+    }
+    for (const key of Object.keys(out)) {
+      out[key].sort((a, b) => {
+        const pa = a.prediction.points || 0;
+        const pb = b.prediction.points || 0;
+        if (pb !== pa) return pb - pa;
+        return a.player.name.localeCompare(b.player.name, 'pt-BR');
+      });
+    }
+    return out;
+  }, [tournamentStarted, predictions, players]);
   // Drafts: { [matchId]: { homeScore, awayScore } }. Picks the user has
   // touched but not yet committed via per-card or bulk save.
   const [drafts, setDrafts] = useState({});
@@ -82,7 +94,7 @@ export default function MatchesPage() {
     const primary   = FILTERS.find(f => f.key === filter)?.match     || (() => true);
     const secondary = PRED_FILTERS.find(f => f.key === predFilter)?.match || (() => true);
     const arr = matches.filter(m =>
-      primary(m) && secondary(m, shownPredictions)
+      primary(m) && secondary(m, predictionsByMatchForMe)
     );
     const rank = (m) => m.status === 'live' ? 0 : m.status === 'scheduled' ? 1 : 2;
     return [...arr].sort((a, b) => {
@@ -92,7 +104,7 @@ export default function MatchesPage() {
       const tb = new Date(b.kickoffAt).getTime();
       return a.status === 'finished' ? tb - ta : ta - tb;
     });
-  }, [matches, filter, predFilter, shownPredictions]);
+  }, [matches, filter, predFilter, predictionsByMatchForMe]);
 
   const groups = useMemo(() => {
     const map = new Map();
@@ -138,21 +150,6 @@ export default function MatchesPage() {
         </Link>
       </div>
 
-      {tournamentStarted && otherPlayers.length > 0 && (
-        <div className="matches-viewing">
-          <label htmlFor="view-as">Ver palpites de:</label>
-          <select
-            id="view-as"
-            value={viewingPlayerId || ''}
-            onChange={(e) => setViewingPlayerId(e.target.value || null)}
-          >
-            <option value="">Eu ({me?.name})</option>
-            {otherPlayers.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
       <div className="matches-filter" role="group" aria-label="Filtrar por fase">
         {FILTERS.map(({ key, label }) => (
           <button
@@ -206,13 +203,13 @@ export default function MatchesPage() {
                     match={match}
                     homeTeam={teamsByCode[match.homeTeam]}
                     awayTeam={teamsByCode[match.awayTeam]}
-                    prediction={shownPredictions[match.id]}
+                    prediction={predictionsByMatchForMe[match.id]}
                     multipliers={config?.roundMultipliers}
                     tournamentStartsAt={config?.tournamentStartsAt}
-                    viewOnly={!viewingMyPicks}
-                    draft={viewingMyPicks ? drafts[match.id] : undefined}
-                    onDraftChange={viewingMyPicks ? onDraftChange : undefined}
-                    onSave={viewingMyPicks ? handleSave(match) : undefined}
+                    allPlayerPicks={picksByMatch[match.id]}
+                    draft={drafts[match.id]}
+                    onDraftChange={onDraftChange}
+                    onSave={handleSave(match)}
                   />
                 ))}
               </div>

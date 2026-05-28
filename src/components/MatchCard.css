@@ -255,6 +255,72 @@
   font-style: italic;
 }
 
+/* Small link-like button at the bottom of a locked card */
+.match-card__see-picks {
+  margin-top: var(--sp-2);
+  width: 100%;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-2);
+  color: var(--c-blue);
+  font-family: var(--font-body);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.match-card__see-picks:hover {
+  background: var(--c-blue-soft);
+}
+
+.picks-table-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.picks-table__actual {
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-small);
+}
+
+.picks-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-small);
+}
+
+.picks-table th,
+.picks-table td {
+  padding: var(--sp-2) var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.picks-table th {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-tiny);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.picks-table .ta-c {
+  text-align: center;
+}
+
+.picks-table tbody tr.is-exact {
+  background: var(--c-lime-soft);
+  font-weight: var(--fw-semibold);
+}
+
+.picks-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
 .match-card__no-pick {
   text-align: center;
 }

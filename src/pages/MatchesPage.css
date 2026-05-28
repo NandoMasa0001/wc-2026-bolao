@@ -26,32 +26,6 @@
   text-decoration: none;
 }
 
-.matches-viewing {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin-bottom: var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
-  background: var(--c-blue-soft);
-  border-radius: var(--r-md);
-  font-size: var(--fs-small);
-}
-
-.matches-viewing label {
-  font-weight: var(--fw-semibold);
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.matches-viewing select {
-  flex: 1;
-  border: 1px solid var(--border);
-  background: var(--bg-surface);
-  border-radius: var(--r-sm);
-  padding: var(--sp-1) var(--sp-2);
-  font-size: var(--fs-small);
-  min-height: 36px;
-}
 
 .matches-filter {
   display: flex;
