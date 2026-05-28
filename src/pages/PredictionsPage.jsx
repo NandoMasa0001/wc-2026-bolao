@@ -8,7 +8,7 @@ import Modal from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { computeStandings, predictedMatchesFromPlayer } from '../lib/standings.js';
-import { buildPredictedR32 } from '../lib/predictedBracket.js';
+import { buildFullBracket } from '../lib/predictedBracket.js';
 import './PredictionsPage.css';
 
 const TABS = [
@@ -22,7 +22,7 @@ const TABS = [
 export default function PredictionsPage() {
   const {
     teams, teamsByCode, teamsByGroup,
-    groupMatches, predictionsByMatchForMe,
+    matches, groupMatches, predictionsByMatchForMe,
     advancementPredictions, finalsPredictions, awardPredictions, pollPredictions,
     extraPredictions, teamBoosts,
     me, confirmAdvancement, saveFinalists, saveAwards, savePollPrediction, saveExtras
@@ -52,6 +52,7 @@ export default function PredictionsPage() {
       {tab === 'advancement' && (
         <AdvancementTab
           groupMatches={groupMatches}
+          allMatches={matches}
           teamsByCode={teamsByCode}
           teamsByGroup={teamsByGroup}
           predictions={predictionsByMatchForMe}
@@ -116,7 +117,7 @@ export default function PredictionsPage() {
 /* Advancement                                                            */
 /* ====================================================================== */
 
-function AdvancementTab({ groupMatches, teamsByCode, teamsByGroup, predictions, confirmed, teamBoosts = {}, onConfirm }) {
+function AdvancementTab({ groupMatches, allMatches, teamsByCode, teamsByGroup, predictions, confirmed, teamBoosts = {}, onConfirm }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   // Build the "as-if predicted" set of matches.
@@ -209,7 +210,12 @@ function AdvancementTab({ groupMatches, teamsByCode, teamsByGroup, predictions, 
       </Card>
 
       <Card>
-        <PredictedBracket standings={standings} teamsByCode={teamsByCode} />
+        <PredictedBracket
+          standings={standings}
+          teamsByCode={teamsByCode}
+          allMatches={allMatches}
+          predictions={predictions}
+        />
       </Card>
 
       <Modal
@@ -246,42 +252,95 @@ function AdvancementTab({ groupMatches, teamsByCode, teamsByGroup, predictions, 
 /* Predicted R32 bracket                                                  */
 /* ====================================================================== */
 
-function PredictedBracket({ standings, teamsByCode }) {
-  const pairings = useMemo(() => buildPredictedR32(standings), [standings]);
+const STAGE_LABELS = {
+  r32:   'Round of 32',
+  r16:   'Oitavas',
+  qf:    'Quartas',
+  sf:    'Semis',
+  third: '3º lugar',
+  final: 'Final'
+};
 
-  if (!pairings.length) {
+function PredictedBracket({ standings, teamsByCode, allMatches, predictions }) {
+  const bracket = useMemo(
+    () => buildFullBracket({ standings, matches: allMatches || [], predictionsByMatchForMe: predictions || {} }),
+    [standings, allMatches, predictions]
+  );
+
+  if (!bracket.length) {
     return (
       <p className="muted">
-        O preview do mata-mata aparece aqui quando você palpitar todos os jogos da fase de grupos.
+        O preview do mata-mata aparece aqui quando você palpitar a fase de grupos.
       </p>
     );
   }
 
+  // Group by stage in order.
+  const byStage = {};
+  for (const m of bracket) {
+    if (!byStage[m.stage]) byStage[m.stage] = [];
+    byStage[m.stage].push(m);
+  }
+  const stageOrder = ['r32', 'r16', 'qf', 'sf', 'third', 'final'];
+
   return (
     <>
-      <h3 className="pred-section-title">Mata-mata previsto — Round of 32</h3>
+      <h3 className="pred-section-title">Mata-mata previsto</h3>
       <p className="muted">
-        Os 16 confrontos do <strong>bracket oficial da FIFA</strong>, preenchidos com as seleções que você palpitou pra passar.
-        <br />
-        Legenda: <strong>1A</strong> = líder do grupo A · <strong>2B</strong> = vice do B · <strong>3C</strong> = melhor 3º entre as classificadas (vindo do grupo C).
+        Bracket oficial FIFA preenchido com as seleções que você palpitou pra passar.
+        Vencedores das rodadas seguintes vêm dos seus <strong>palpites de placar</strong> nos jogos de mata-mata (em <em>Jogos</em>).
+        Empate → próximo confronto fica em branco.
       </p>
-      <ol className="bracket-list">
-        {pairings.map((p) => (
-          <li key={p.id} className="bracket-match">
-            <span className="bracket-match__num">{p.label}</span>
-            <div className="bracket-match__side">
-              <span className="bracket-match__seed">{p.labelHome}</span>
-              <TeamChip team={teamsByCode[p.home]} size="sm" showCode placeholder={!p.home ? '?' : undefined} />
+
+      <div className="bracket-stack">
+        {stageOrder.map(stage => byStage[stage] && (
+          <section key={stage} className="bracket-stage">
+            <h4 className="bracket-stage__title">{STAGE_LABELS[stage]}</h4>
+            <div className="bracket-grid">
+              {byStage[stage].map(m => (
+                <BracketCell key={m.id} match={m} teamsByCode={teamsByCode} />
+              ))}
             </div>
-            <span className="bracket-match__vs">vs</span>
-            <div className="bracket-match__side bracket-match__side--right">
-              <TeamChip team={teamsByCode[p.away]} size="sm" showCode placeholder={!p.away ? '?' : undefined} />
-              <span className="bracket-match__seed">{p.labelAway}</span>
-            </div>
-          </li>
+          </section>
         ))}
-      </ol>
+      </div>
     </>
+  );
+}
+
+function BracketCell({ match: m, teamsByCode }) {
+  const home = m.home ? teamsByCode[m.home] : null;
+  const away = m.away ? teamsByCode[m.away] : null;
+  const homeWon = m.winner && m.winner === m.home;
+  const awayWon = m.winner && m.winner === m.away;
+  const score = m.predictedScore;
+
+  return (
+    <div className="bracket-cell" title={`${m.id} · ${m.homeLabel} vs ${m.awayLabel}`}>
+      <span className="bracket-cell__num">{m.id}</span>
+      <div className="bracket-cell__row">
+        <BracketSide team={home} fallback={m.homeLabel} highlight={homeWon} />
+        <span className="bracket-cell__score tabular">
+          {score ? `${score.homeScore}–${score.awayScore}` : 'vs'}
+        </span>
+        <BracketSide team={away} fallback={m.awayLabel} highlight={awayWon} reverse />
+      </div>
+    </div>
+  );
+}
+
+function BracketSide({ team, fallback, highlight, reverse }) {
+  return (
+    <div className={'bracket-side' + (highlight ? ' is-winner' : '') + (reverse ? ' bracket-side--reverse' : '')}>
+      {team ? (
+        <>
+          <img className="bracket-side__flag" src={team.flagUrl} alt={team.name} width="28" height="20" />
+          <span className="bracket-side__code">{team.code}</span>
+        </>
+      ) : (
+        <span className="bracket-side__placeholder">{fallback || '?'}</span>
+      )}
+    </div>
   );
 }
 

@@ -1,80 +1,117 @@
 /**
- * predictedBracket.js — build the official FIFA 2026 Round-of-32 bracket
- * filled in with a player's predicted group standings.
+ * predictedBracket.js — full FIFA 2026 knockout bracket (R32 → Final),
+ * filled with the player's predicted advancing teams AND propagated
+ * through each round using the player's predicted knockout scores.
  *
- * The 16 R32 matchups below are taken straight from the FIFA fixture list
- * for the 2026 World Cup. 8 of them include a "Best 3rd from {…}" slot —
- * which specific best-3rd team goes into which slot is determined by FIFA
- * via a lookup table over the possible combinations of qualifying groups.
+ * If a player hasn't predicted a knockout match (or predicted a tie),
+ * the downstream slot stays null and we display a placeholder.
  *
- * We solve it via backtracking: for each combination of 8 best-3rd groups,
- * find an assignment that satisfies every "from" constraint. This produces
- * a valid bracket — not necessarily identical to FIFA's official one for
- * borderline cases, but always feasible.
+ * Source: FIFA 2026 fixture list (matches 73 → 104).
  */
 
-/** The 16 R32 matchups, in FIFA's match-number order (73 → 88). */
-const R32_STRUCTURE = [
-  { id: 'M73', home: { type: 'runnerUp', group: 'A' },  away: { type: 'runnerUp', group: 'B' } },
-  { id: 'M74', home: { type: 'winner',   group: 'E' },  away: { type: 'best3rd', from: ['A','B','C','D','F'] } },
-  { id: 'M75', home: { type: 'winner',   group: 'F' },  away: { type: 'runnerUp', group: 'C' } },
-  { id: 'M76', home: { type: 'winner',   group: 'C' },  away: { type: 'runnerUp', group: 'F' } },
-  { id: 'M77', home: { type: 'winner',   group: 'I' },  away: { type: 'best3rd', from: ['C','D','F','G','H'] } },
-  { id: 'M78', home: { type: 'runnerUp', group: 'E' },  away: { type: 'runnerUp', group: 'I' } },
-  { id: 'M79', home: { type: 'winner',   group: 'A' },  away: { type: 'best3rd', from: ['C','E','F','H','I'] } },
-  { id: 'M80', home: { type: 'winner',   group: 'L' },  away: { type: 'best3rd', from: ['E','H','I','J','K'] } },
-  { id: 'M81', home: { type: 'winner',   group: 'D' },  away: { type: 'best3rd', from: ['B','E','F','I','J'] } },
-  { id: 'M82', home: { type: 'winner',   group: 'G' },  away: { type: 'best3rd', from: ['A','E','H','I','J'] } },
-  { id: 'M83', home: { type: 'runnerUp', group: 'K' },  away: { type: 'runnerUp', group: 'L' } },
-  { id: 'M84', home: { type: 'winner',   group: 'H' },  away: { type: 'runnerUp', group: 'J' } },
-  { id: 'M85', home: { type: 'winner',   group: 'B' },  away: { type: 'best3rd', from: ['E','F','G','I','J'] } },
-  { id: 'M86', home: { type: 'winner',   group: 'J' },  away: { type: 'runnerUp', group: 'H' } },
-  { id: 'M87', home: { type: 'winner',   group: 'K' },  away: { type: 'best3rd', from: ['D','E','I','J','L'] } },
-  { id: 'M88', home: { type: 'runnerUp', group: 'D' },  away: { type: 'runnerUp', group: 'G' } }
+/** Bracket structure — 32 matches total. */
+const BRACKET = [
+  // ---------------- Round of 32 (M73 → M88) ----------------
+  { id: 'M73', stage: 'r32', home: { type: 'groupPos', group: 'A', pos: 2 }, away: { type: 'groupPos', group: 'B', pos: 2 } },
+  { id: 'M74', stage: 'r32', home: { type: 'groupPos', group: 'E', pos: 1 }, away: { type: 'best3rd', from: ['A','B','C','D','F'] } },
+  { id: 'M75', stage: 'r32', home: { type: 'groupPos', group: 'F', pos: 1 }, away: { type: 'groupPos', group: 'C', pos: 2 } },
+  { id: 'M76', stage: 'r32', home: { type: 'groupPos', group: 'C', pos: 1 }, away: { type: 'groupPos', group: 'F', pos: 2 } },
+  { id: 'M77', stage: 'r32', home: { type: 'groupPos', group: 'I', pos: 1 }, away: { type: 'best3rd', from: ['C','D','F','G','H'] } },
+  { id: 'M78', stage: 'r32', home: { type: 'groupPos', group: 'E', pos: 2 }, away: { type: 'groupPos', group: 'I', pos: 2 } },
+  { id: 'M79', stage: 'r32', home: { type: 'groupPos', group: 'A', pos: 1 }, away: { type: 'best3rd', from: ['C','E','F','H','I'] } },
+  { id: 'M80', stage: 'r32', home: { type: 'groupPos', group: 'L', pos: 1 }, away: { type: 'best3rd', from: ['E','H','I','J','K'] } },
+  { id: 'M81', stage: 'r32', home: { type: 'groupPos', group: 'D', pos: 1 }, away: { type: 'best3rd', from: ['B','E','F','I','J'] } },
+  { id: 'M82', stage: 'r32', home: { type: 'groupPos', group: 'G', pos: 1 }, away: { type: 'best3rd', from: ['A','E','H','I','J'] } },
+  { id: 'M83', stage: 'r32', home: { type: 'groupPos', group: 'K', pos: 2 }, away: { type: 'groupPos', group: 'L', pos: 2 } },
+  { id: 'M84', stage: 'r32', home: { type: 'groupPos', group: 'H', pos: 1 }, away: { type: 'groupPos', group: 'J', pos: 2 } },
+  { id: 'M85', stage: 'r32', home: { type: 'groupPos', group: 'B', pos: 1 }, away: { type: 'best3rd', from: ['E','F','G','I','J'] } },
+  { id: 'M86', stage: 'r32', home: { type: 'groupPos', group: 'J', pos: 1 }, away: { type: 'groupPos', group: 'H', pos: 2 } },
+  { id: 'M87', stage: 'r32', home: { type: 'groupPos', group: 'K', pos: 1 }, away: { type: 'best3rd', from: ['D','E','I','J','L'] } },
+  { id: 'M88', stage: 'r32', home: { type: 'groupPos', group: 'D', pos: 2 }, away: { type: 'groupPos', group: 'G', pos: 2 } },
+
+  // ---------------- Round of 16 (M89 → M96) ----------------
+  { id: 'M89', stage: 'r16', home: { type: 'winnerOf', match: 'M74' }, away: { type: 'winnerOf', match: 'M77' } },
+  { id: 'M90', stage: 'r16', home: { type: 'winnerOf', match: 'M73' }, away: { type: 'winnerOf', match: 'M75' } },
+  { id: 'M91', stage: 'r16', home: { type: 'winnerOf', match: 'M76' }, away: { type: 'winnerOf', match: 'M78' } },
+  { id: 'M92', stage: 'r16', home: { type: 'winnerOf', match: 'M79' }, away: { type: 'winnerOf', match: 'M80' } },
+  { id: 'M93', stage: 'r16', home: { type: 'winnerOf', match: 'M83' }, away: { type: 'winnerOf', match: 'M84' } },
+  { id: 'M94', stage: 'r16', home: { type: 'winnerOf', match: 'M81' }, away: { type: 'winnerOf', match: 'M82' } },
+  { id: 'M95', stage: 'r16', home: { type: 'winnerOf', match: 'M86' }, away: { type: 'winnerOf', match: 'M88' } },
+  { id: 'M96', stage: 'r16', home: { type: 'winnerOf', match: 'M85' }, away: { type: 'winnerOf', match: 'M87' } },
+
+  // ---------------- Quarter-finals (M97 → M100) ----------------
+  { id: 'M97',  stage: 'qf', home: { type: 'winnerOf', match: 'M89' }, away: { type: 'winnerOf', match: 'M90' } },
+  { id: 'M98',  stage: 'qf', home: { type: 'winnerOf', match: 'M93' }, away: { type: 'winnerOf', match: 'M94' } },
+  { id: 'M99',  stage: 'qf', home: { type: 'winnerOf', match: 'M91' }, away: { type: 'winnerOf', match: 'M92' } },
+  { id: 'M100', stage: 'qf', home: { type: 'winnerOf', match: 'M95' }, away: { type: 'winnerOf', match: 'M96' } },
+
+  // ---------------- Semi-finals (M101 → M102) ----------------
+  { id: 'M101', stage: 'sf', home: { type: 'winnerOf', match: 'M97' }, away: { type: 'winnerOf', match: 'M98' } },
+  { id: 'M102', stage: 'sf', home: { type: 'winnerOf', match: 'M99' }, away: { type: 'winnerOf', match: 'M100' } },
+
+  // ---------------- Bronze final (M103) ----------------
+  { id: 'M103', stage: 'third', home: { type: 'loserOf', match: 'M101' }, away: { type: 'loserOf', match: 'M102' } },
+
+  // ---------------- Final (M104) ----------------
+  { id: 'M104', stage: 'final', home: { type: 'winnerOf', match: 'M101' }, away: { type: 'winnerOf', match: 'M102' } }
 ];
 
-/**
- * Given the 8 best-3rd groups, assign each to one of the 8 R32 slots that
- * accept best-3rds, respecting each slot's "from" constraint. Uses simple
- * backtracking. Returns `{ slotId: groupLetter }` or null if no
- * assignment exists.
- */
-function assignBest3rds(best3rdGroups, slotsWithConstraints) {
-  if (best3rdGroups.length !== slotsWithConstraints.length) return null;
+/* ============== Best-3rd assignment ============== */
 
+function assignBest3rds(groupsAvailable, slots) {
+  if (groupsAvailable.length !== slots.length) return null;
   const result = {};
-  const usedGroups = new Set();
-
-  function backtrack(slotIdx) {
-    if (slotIdx === slotsWithConstraints.length) return true;
-    const slot = slotsWithConstraints[slotIdx];
-    for (const g of best3rdGroups) {
-      if (usedGroups.has(g)) continue;
-      if (!slot.allowed.has(g)) continue;
+  const used = new Set();
+  function go(i) {
+    if (i === slots.length) return true;
+    const slot = slots[i];
+    for (const g of groupsAvailable) {
+      if (used.has(g) || !slot.allowed.has(g)) continue;
       result[slot.id] = g;
-      usedGroups.add(g);
-      if (backtrack(slotIdx + 1)) return true;
+      used.add(g);
+      if (go(i + 1)) return true;
       delete result[slot.id];
-      usedGroups.delete(g);
+      used.delete(g);
     }
     return false;
   }
-
-  return backtrack(0) ? result : null;
+  return go(0) ? result : null;
 }
 
+/* ============== FIFA ↔ DB id map ============== */
+
+const FIFA_START = { r32: 73, r16: 89, qf: 97, sf: 101, third: 103, final: 104 };
+
+function buildFifaToDbMap(matches) {
+  const out = {};
+  for (const stage of Object.keys(FIFA_START)) {
+    const inStage = matches
+      .filter(m => m.stage === stage)
+      .sort((a, b) => new Date(a.kickoffAt) - new Date(b.kickoffAt));
+    for (let i = 0; i < inStage.length; i++) {
+      out[`M${FIFA_START[stage] + i}`] = inStage[i].id;
+    }
+  }
+  return out;
+}
+
+/* ============== Build the full bracket ============== */
+
 /**
- * Build the 16-match R32 preview.
+ * @param {object} args
+ * @param {object} args.standings — output of computeStandings(...)
+ * @param {Array}  args.matches   — all matches (need stage + id + kickoffAt)
+ * @param {object} args.predictionsByMatchForMe — { dbMatchId: { homeScore, awayScore } }
  *
- * @param {object} standings — output of computeStandings(...)
- * @returns {Array} 16 match objects:
- *   { id, label, home: teamCode|null, away: teamCode|null,
- *     labelHome: '1A'|'2B'|'3X', labelAway: '...' }
+ * Returns the 32 bracket entries, each with:
+ *   { id, stage, home, away, homeLabel, awayLabel, winner, loser,
+ *     predictedScore: { homeScore, awayScore } | null,
+ *     dbMatchId: string | null }
  */
-export function buildPredictedR32(standings) {
+export function buildFullBracket({ standings, matches, predictionsByMatchForMe = {} }) {
   if (!standings || !standings.groups) return [];
 
-  // Pre-compute the best-3rds (top 8) by group letter.
+  // 1. Best-3rds (top 8) and groups.
   const top8Thirds = (standings.bestThirds || [])
     .filter(t => standings.advancing?.has(t.team))
     .slice(0, 8);
@@ -83,44 +120,74 @@ export function buildPredictedR32(standings) {
     if (t.group) thirdByGroup[t.group] = t.team;
   }
 
-  // Collect the best-3rd slots and try to assign groups.
-  const best3rdSlots = R32_STRUCTURE
-    .filter(m => m.away.type === 'best3rd' || m.home.type === 'best3rd')
+  // 2. Solve best-3rd slot assignment.
+  const best3rdSlots = BRACKET
+    .filter(m => m.home.type === 'best3rd' || m.away.type === 'best3rd')
     .map(m => {
       const slot = m.away.type === 'best3rd' ? m.away : m.home;
       return { id: m.id, allowed: new Set(slot.from) };
     });
+  const best3rdAssignment =
+    assignBest3rds(Object.keys(thirdByGroup), best3rdSlots) || {};
 
-  const assignment = assignBest3rds(Object.keys(thirdByGroup), best3rdSlots) || {};
+  // 3. FIFA → DB id map.
+  const fifaToDb = buildFifaToDbMap(matches);
 
-  // Resolve a side spec → { team, label }.
-  function resolveSide(spec, matchId) {
-    if (spec.type === 'winner') {
-      const row = standings.groups[spec.group]?.[0];
-      return { team: row?.team || null, label: `1${spec.group}` };
+  // 4. Resolve matches recursively, caching.
+  const resolved = {};
+
+  function resolveSide(spec, fifaId) {
+    if (spec.type === 'groupPos') {
+      const row = standings.groups[spec.group]?.[spec.pos - 1];
+      return { team: row?.team || null, label: `${spec.pos}${spec.group}` };
     }
-    if (spec.type === 'runnerUp') {
-      const row = standings.groups[spec.group]?.[1];
-      return { team: row?.team || null, label: `2${spec.group}` };
+    if (spec.type === 'best3rd') {
+      const g = best3rdAssignment[fifaId];
+      return {
+        team: g ? thirdByGroup[g] : null,
+        label: g ? `3${g}` : '3º'
+      };
     }
-    // best3rd
-    const g = assignment[matchId];
-    return {
-      team: g ? thirdByGroup[g] : null,
-      label: g ? `3${g}` : `3º {${spec.from.join('/')}}`
-    };
+    if (spec.type === 'winnerOf') {
+      const r = resolveMatch(spec.match);
+      return { team: r.winner, label: r.winner ? null : `W ${spec.match}` };
+    }
+    if (spec.type === 'loserOf') {
+      const r = resolveMatch(spec.match);
+      return { team: r.loser, label: r.loser ? null : `L ${spec.match}` };
+    }
+    return { team: null, label: '?' };
   }
 
-  return R32_STRUCTURE.map(m => {
-    const h = resolveSide(m.home, m.id);
-    const a = resolveSide(m.away, m.id);
-    return {
-      id: m.id,
-      label: m.id, // "M73", "M74", …
-      home: h.team,
-      away: a.team,
-      labelHome: h.label,
-      labelAway: a.label
+  function resolveMatch(fifaId) {
+    if (resolved[fifaId]) return resolved[fifaId];
+    const m = BRACKET.find(x => x.id === fifaId);
+    const home = resolveSide(m.home, fifaId);
+    const away = resolveSide(m.away, fifaId);
+    const dbMatchId = fifaToDb[fifaId] || null;
+    const pred = dbMatchId ? predictionsByMatchForMe[dbMatchId] : null;
+    let winner = null, loser = null;
+    if (pred && home.team && away.team && pred.homeScore !== pred.awayScore) {
+      if (pred.homeScore > pred.awayScore) {
+        winner = home.team; loser = away.team;
+      } else {
+        winner = away.team; loser = home.team;
+      }
+    }
+    resolved[fifaId] = {
+      id: fifaId,
+      stage: m.stage,
+      home: home.team,
+      away: away.team,
+      homeLabel: home.label,
+      awayLabel: away.label,
+      winner,
+      loser,
+      predictedScore: pred ? { homeScore: pred.homeScore, awayScore: pred.awayScore } : null,
+      dbMatchId
     };
-  });
+    return resolved[fifaId];
+  }
+
+  return BRACKET.map(m => resolveMatch(m.id));
 }
