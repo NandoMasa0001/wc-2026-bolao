@@ -216,10 +216,23 @@ async function runForLeague({ league, apiMatches, championOdds, primaryResults }
   for (const pr of predRows || []) {
     const match = matchesById[pr.match_id];
     if (!match) continue;
-    const predObj = { homeScore: pr.home_score, awayScore: pr.away_score };
+    const predObj = {
+      homeScore: pr.home_score,
+      awayScore: pr.away_score,
+      advancer: pr.advancer || null
+    };
+    // Pass the full match object so scoring can read winner/homeTeam/awayTeam
+    // for the knockout advancer rule.
+    const actualForScoring = {
+      homeScore: match.home_score,
+      awayScore: match.away_score,
+      homeTeam: match.home_team,
+      awayTeam: match.away_team,
+      winner: match.winner
+    };
     let points = 0;
     if (match.status === 'finished') {
-      points = matchPoints(predObj, match, match.stage, multipliers);
+      points = matchPoints(predObj, actualForScoring, match.stage, multipliers);
     }
     if (points !== pr.points) predUpdates.push({ ...pr, points });
     if (!playerAgg.has(pr.player_id)) {
@@ -229,7 +242,7 @@ async function runForLeague({ league, apiMatches, championOdds, primaryResults }
     agg.predictionsMade += 1;
     if (match.status === 'finished') {
       agg.matches += points;
-      if (baseMatchPoints(predObj, match) === 7) agg.exactScores += 1;
+      if (baseMatchPoints(predObj, actualForScoring) === 7) agg.exactScores += 1;
     }
   }
 

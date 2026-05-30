@@ -96,7 +96,17 @@ export function pickedOutcomeProb(prediction, odds) {
  *   odds:  object — H2H odds; if `boost` not provided, we derive it from
  *                   the player's picked outcome.
  *
- * Backward-compatible: callers that don't pass options get boost = 1.
+ * Knockout advancer rule (only when stage !== 'group'):
+ *   - If the player predicted a TIE AND included `prediction.advancer`:
+ *       • Actual ended non-tie + advancer correct → base += 2
+ *         (upgrades a 0 to 2 — "resultado correto", or 1 to 3 — "+1 placar")
+ *       • Actual ended tie (cravou) + advancer wrong → base -= 1
+ *         (penalty: cravou would be 7 → 6)
+ *   "actual winner" comes from `actual.winner` (set by the cron once the
+ *   real result lands) or from the score sign as a fallback.
+ *
+ * Backward-compatible: callers that don't pass options get boost = 1
+ * and the advancer rule only applies when `prediction.advancer` is set.
  */
 export function matchPoints(
   prediction,
@@ -105,8 +115,43 @@ export function matchPoints(
   multipliers = DEFAULT_ROUND_MULTIPLIERS,
   options = {}
 ) {
-  const base = baseMatchPoints(prediction, actual);
-  if (base === 0) return 0;
+  let base = baseMatchPoints(prediction, actual);
+
+  // Knockout advancer adjustments — only when both prediction and actual
+  // have scores, this is a knockout stage, and the player predicted a tie
+  // with an explicit advancer.
+  const isKnockout = stage && stage !== 'group';
+  if (isKnockout && prediction && actual &&
+      prediction.homeScore != null && prediction.awayScore != null &&
+      actual.homeScore != null && actual.awayScore != null) {
+    const ph = prediction.homeScore;
+    const pa = prediction.awayScore;
+    const ah = actual.homeScore;
+    const aa = actual.awayScore;
+    const predictedTie = ph === pa;
+    const actualTie = ah === aa;
+
+    if (predictedTie && prediction.advancer) {
+      // Who actually advanced — prefer the explicit winner field (set on
+      // penalty-shootout results), then fall back to score comparison.
+      const actualWinner =
+        actual.winner ||
+        (ah > aa ? actual.homeTeam : aa > ah ? actual.awayTeam : null);
+
+      const advancerCorrect = actualWinner && prediction.advancer === actualWinner;
+
+      if (predictedTie && actualTie && base === 7) {
+        // Cravou empate: keep 7 if advancer correct, drop to 6 if wrong.
+        if (actualWinner && !advancerCorrect) base -= 1;
+      } else if (predictedTie && !actualTie) {
+        // Predicted tie, actual non-tie: credit "correct outcome" via the
+        // advancer (+2 base on top of whatever team-match credit there was).
+        if (advancerCorrect) base += 2;
+      }
+    }
+  }
+
+  if (base <= 0) return 0;
   const mult = multipliers[stage] ?? 1;
 
   let boost = 1;

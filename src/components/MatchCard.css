@@ -255,6 +255,36 @@
   font-style: italic;
 }
 
+.match-card__advancer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin-top: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-blue-soft);
+  border-radius: var(--r-md);
+  font-size: var(--fs-small);
+}
+
+.match-card__advancer label {
+  font-weight: var(--fw-semibold);
+  color: var(--text-primary);
+}
+
+.match-card__advancer select {
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface);
+  padding: var(--sp-2);
+  font-size: var(--fs-small);
+  min-height: 36px;
+}
+
+.match-card__predicted-advancer {
+  font-size: var(--fs-small);
+  margin-top: 2px;
+}
+
 /* Small link-like button at the bottom of a locked card */
 .match-card__see-picks {
   margin-top: var(--sp-2);

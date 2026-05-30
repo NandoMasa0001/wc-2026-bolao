@@ -99,50 +99,66 @@ export default function MatchCard({
   onDraftChange     // (matchId, { homeScore, awayScore } | null) -> void
 }) {
   const [picksOpen, setPicksOpen] = useState(false);
-  // Knockout matches are visualization-only — never user-predictable.
-  // The bracket on /palpites shows them; predictions only happen on
-  // group-stage games.
-  const isKnockoutPlaceholder = match.stage !== 'group';
+  // Knockout matches are predictable ONLY when both teams are known
+  // (i.e., after the previous round finishes). Until then they stay as
+  // visualization placeholders.
+  const isKnockout = match.stage !== 'group';
+  const isKnockoutPlaceholder = isKnockout && (!match.homeTeam || !match.awayTeam);
 
   // Source of truth precedence: draft > saved prediction > 0/0.
   const initialHome = draft?.homeScore ?? prediction?.homeScore ?? 0;
   const initialAway = draft?.awayScore ?? prediction?.awayScore ?? 0;
   const [home, setHome] = useState(initialHome);
   const [away, setAway] = useState(initialAway);
+  const [advancer, setAdvancer] = useState(draft?.advancer ?? prediction?.advancer ?? '');
   const [editing, setEditing] = useState(false);
 
   // Keep local state in sync when a saved prediction or draft arrives from outside.
   useEffect(() => {
     setHome(draft?.homeScore ?? prediction?.homeScore ?? 0);
     setAway(draft?.awayScore ?? prediction?.awayScore ?? 0);
-  }, [prediction?.homeScore, prediction?.awayScore, draft?.homeScore, draft?.awayScore]);
+    setAdvancer(draft?.advancer ?? prediction?.advancer ?? '');
+  }, [prediction?.homeScore, prediction?.awayScore, prediction?.advancer,
+      draft?.homeScore, draft?.awayScore, draft?.advancer]);
+
+  // Whether the current pick needs an advancer (knockout + predicted tie).
+  const needsAdvancer = isKnockout && home === away;
+  const advancerValid = !needsAdvancer || (advancer === match.homeTeam || advancer === match.awayTeam);
 
   // Bubble stepper changes up to the parent so a "Save all" button can
   // commit them at once. Only fires when the value differs from what's
   // currently saved (otherwise stops being a draft).
-  const reportDraft = (h, a) => {
+  const reportDraft = (h, a, adv) => {
     if (!onDraftChange) return;
     const matchesSaved =
-      prediction && prediction.homeScore === h && prediction.awayScore === a;
+      prediction &&
+      prediction.homeScore === h &&
+      prediction.awayScore === a &&
+      (prediction.advancer || '') === (adv || '');
     if (matchesSaved) {
       onDraftChange(match.id, null);
     } else {
-      onDraftChange(match.id, { homeScore: h, awayScore: a });
+      onDraftChange(match.id, { homeScore: h, awayScore: a, advancer: adv || null });
     }
   };
 
-  const setHomeAndReport = (n) => { setHome(n); reportDraft(n, away); };
-  const setAwayAndReport = (n) => { setAway(n); reportDraft(home, n); };
+  const setHomeAndReport = (n) => { setHome(n); reportDraft(n, away, advancer); };
+  const setAwayAndReport = (n) => { setAway(n); reportDraft(home, n, advancer); };
+  const setAdvancerAndReport = (v) => { setAdvancer(v); reportDraft(home, away, v); };
 
-  // Single tournament-wide lock: everything (group predictions included)
-  // locks at the moment the World Cup starts (first kickoff). After that,
-  // even still-scheduled matches can't have their predictions changed.
+  // Lock rule branches by stage:
+  //   - Group matches: lock globally at the tournament's opening kickoff.
+  //   - Knockout matches: lock individually at each match's kickoff (and
+  //     stay locked until both teams are filled in).
   const tournamentStarted = tournamentStartsAt
     ? new Date(tournamentStartsAt).getTime() <= Date.now()
     : false;
+  const kickoffPassed = new Date(match.kickoffAt).getTime() <= Date.now();
   const isLive = match.status === 'live';
   const isFinished = match.status === 'finished';
-  const locked = tournamentStarted || match.status !== 'scheduled' || isKnockoutPlaceholder;
+  const locked = isKnockout
+    ? (isKnockoutPlaceholder || kickoffPassed || match.status !== 'scheduled')
+    : (tournamentStarted || match.status !== 'scheduled');
   const hasPrediction = !!prediction;
 
   const countdown = useCountdown(match.kickoffAt);
@@ -160,7 +176,11 @@ export default function MatchCard({
   const showSteppers = !locked && (editing || !hasPrediction);
 
   const handleSave = () => {
-    onSave?.({ homeScore: home, awayScore: away });
+    if (!advancerValid) return;
+    const payload = { homeScore: home, awayScore: away };
+    if (needsAdvancer) payload.advancer = advancer;
+    else payload.advancer = null; // clear stale advancer if user changed from tie to non-tie
+    onSave?.(payload);
     setEditing(false);
     onDraftChange?.(match.id, null);
   };
@@ -256,6 +276,22 @@ export default function MatchCard({
                 ariaLabel={`Gols para ${awayTeam?.name || 'visitante'}`}
               />
             </div>
+            {needsAdvancer && (
+              <div className="match-card__advancer">
+                <label htmlFor={`adv-${match.id}`}>
+                  Quem passa? <span className="muted">(obrigatório no empate)</span>
+                </label>
+                <select
+                  id={`adv-${match.id}`}
+                  value={advancer}
+                  onChange={(e) => setAdvancerAndReport(e.target.value)}
+                >
+                  <option value="">— escolha —</option>
+                  <option value={match.homeTeam}>{homeTeam?.name || match.homeTeam}</option>
+                  <option value={match.awayTeam}>{awayTeam?.name || match.awayTeam}</option>
+                </select>
+              </div>
+            )}
             <div className="match-card__actions">
               {hasPrediction && (
                 <Button
@@ -264,13 +300,18 @@ export default function MatchCard({
                     setEditing(false);
                     setHome(prediction.homeScore);
                     setAway(prediction.awayScore);
+                    setAdvancer(prediction.advancer || '');
                     onDraftChange?.(match.id, null);
                   }}
                 >
                   Cancelar
                 </Button>
               )}
-              <Button variant="primary" onClick={handleSave} disabled={locked}>
+              <Button
+                variant="primary"
+                onClick={handleSave}
+                disabled={locked || !advancerValid}
+              >
                 {hasPrediction ? 'Atualizar' : 'Salvar palpite'}
               </Button>
             </div>
@@ -282,6 +323,11 @@ export default function MatchCard({
               <div className="match-card__predicted-score tabular">
                 {prediction.homeScore}<span className="match-card__sep">–</span>{prediction.awayScore}
               </div>
+              {prediction.advancer && (
+                <div className="match-card__predicted-advancer muted">
+                  Passa: <strong>{prediction.advancer === match.homeTeam ? (homeTeam?.name || match.homeTeam) : (awayTeam?.name || match.awayTeam)}</strong>
+                </div>
+              )}
               {isFinished && (
                 <span
                   className={

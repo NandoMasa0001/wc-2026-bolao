@@ -150,7 +150,7 @@ function MockDataProvider({ children }) {
     for (const pl of players) recomputePlayer(pl.id);
   }, [players, recomputePlayer]);
 
-  const savePrediction = useCallback(async (matchId, { homeScore, awayScore }) => {
+  const savePrediction = useCallback(async (matchId, { homeScore, awayScore, advancer }) => {
     if (!session) return;
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
@@ -160,7 +160,9 @@ function MockDataProvider({ children }) {
     const key = `${session.id}_${matchId}`;
     const next = {
       playerId: session.id, matchId, stage: match.stage,
-      homeScore, awayScore, points: 0,
+      homeScore, awayScore,
+      advancer: advancer ?? null,
+      points: 0,
       updatedAt: new Date().toISOString()
     };
     setPredictions((prev) => {
@@ -343,6 +345,7 @@ const fromPredictionRow = (r) => ({
   stage:     r.stage,
   homeScore: r.home_score,
   awayScore: r.away_score,
+  advancer:  r.advancer || null,
   points:    r.points,
   updatedAt: r.updated_at
 });
@@ -626,7 +629,7 @@ function SupabaseDataProvider({ children }) {
   );
 
   /* -------------- Mutators -------------- */
-  const savePrediction = useCallback(async (matchId, { homeScore, awayScore }) => {
+  const savePrediction = useCallback(async (matchId, { homeScore, awayScore, advancer }) => {
     if (!session) return;
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
@@ -638,6 +641,7 @@ function SupabaseDataProvider({ children }) {
         stage: match.stage,
         home_score: homeScore,
         away_score: awayScore,
+        advancer: advancer ?? null,
         points: 0,
         updated_at: new Date().toISOString()
       }, { onConflict: 'player_id,match_id' });

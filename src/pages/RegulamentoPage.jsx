@@ -64,6 +64,21 @@ export default function RegulamentoPage() {
             </tbody>
           </table>
         </div>
+        <div className="reg-section">
+          <h4 className="reg-h4">No mata-mata, empate exige escolher quem passa</h4>
+          <p>
+            Empate não existe em jogo eliminatório — alguém sempre passa (prorrogação / pênaltis). Por isso, sempre que você palpitar um placar de empate num jogo de mata-mata, é obrigatório escolher também a seleção que avança. O sistema usa essa escolha pra recompensar/penalizar:
+          </p>
+          <ul className="reg-ul">
+            <li><strong>Cravou o empate + acertou quem passa</strong>: 7 pts cheios.</li>
+            <li><strong>Cravou o empate + errou quem passa</strong>: 6 pts (perde 1).</li>
+            <li><strong>Palpitou empate, real foi não-empate + acertou quem passa</strong>: vira "acertou o resultado" (+2 base).</li>
+            <li><strong>Palpitou empate, real foi não-empate + errou quem passa</strong>: 0 (ou 1, se acertou o nº de gols de um dos times).</li>
+          </ul>
+          <p className="muted reg-foot">
+            Jogos de mata-mata só ficam palpitáveis depois que os times anteriores forem definidos (R32 abre quando grupos terminarem; R16 abre quando R32 terminar; etc.). Cada jogo trava no seu próprio apito inicial.
+          </p>
+        </div>
       </Card>
 
       {/* ======================= 2. MULTIPLICADORES ======================= */}
@@ -221,13 +236,9 @@ export default function RegulamentoPage() {
       <Card className="reg-card">
         <h3 className="reg-h">6. Quando os palpites travam</h3>
         <ul className="reg-ul">
-          <li><strong>Tudo trava de uma vez</strong> no apito inicial do <strong>primeiro jogo</strong> do mundial — 11/jun/2026. Isso inclui:
-            <ul className="reg-ul">
-              <li>Os 72 placares da fase de grupos (mesmo que aquele jogo específico só seja jogado dias depois)</li>
-              <li>Classificação, finalistas, prêmios, zebra, todas as apostas extras</li>
-            </ul>
-          </li>
-          <li>Depois da trava, ninguém pode mais mexer em nada. Mas <strong>todo mundo pode ver os palpites dos outros</strong> (dropdown na página de Jogos).</li>
+          <li><strong>Grupos + palpites longos</strong> travam todos juntos no apito inicial do <strong>primeiro jogo</strong> do mundial (11/jun/2026): 72 placares da fase de grupos, classificação, finalistas, prêmios, zebra, todas as apostas extras.</li>
+          <li><strong>Mata-mata</strong> funciona diferente: cada jogo só fica palpitável depois que os times forem definidos pela rodada anterior, e trava no seu próprio apito inicial. Por exemplo, R32 abre quando os grupos terminam, R16 abre quando o R32 termina, etc.</li>
+          <li>Depois da trava de um jogo, todo mundo pode ver os palpites dos outros (modal "Ver palpites dos amigos" no card).</li>
           <li><strong>Votação da zebra/decepção</strong> só é permitida quando o admin abrir, depois da final.</li>
         </ul>
         <p className="muted reg-foot">

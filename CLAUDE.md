@@ -438,6 +438,18 @@ Claude Code cannot do these; they need real accounts:
 
 ---
 
+## 13.5. Hard rule: knockout matches are never user-predictable before teams are defined
+
+The user has made this explicit: **never expose the score stepper / save UI
+for a knockout match whose `home_team` or `away_team` is still null**. They
+stay as visualization-only (the bracket fills in from real results) until
+the football-data.org feed populates both teams. Only after that — i.e.,
+once the previous round has finished — can a knockout match become
+predictable. Reopening predictability earlier than that is against the
+owner's design intent, regardless of how convenient it would be.
+
+---
+
 ## 14. Open items to confirm with the owner
 
 - Third-place playoff multiplier currently defaults to the quarter-final value
