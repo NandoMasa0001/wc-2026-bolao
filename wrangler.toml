@@ -18,3 +18,11 @@ name = "bolaofamilia"
 [env.familia.assets]
 directory = "./dist"
 not_found_handling = "single-page-application"
+
+# ---------- env: scib (Bolao-SCIB league) ----------
+[env.scib]
+name = "bolao-scib"
+
+[env.scib.assets]
+directory = "./dist"
+not_found_handling = "single-page-application"

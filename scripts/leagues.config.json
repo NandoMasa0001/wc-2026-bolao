@@ -1,4 +1,5 @@
 [
   { "name": "trupe",   "urlEnv": "SUPABASE_URL_TRUPE",   "keyEnv": "SUPABASE_SERVICE_KEY_TRUPE",   "isPrimary": true  },
-  { "name": "familia", "urlEnv": "SUPABASE_URL_FAMILIA", "keyEnv": "SUPABASE_SERVICE_KEY_FAMILIA", "isPrimary": false }
+  { "name": "familia", "urlEnv": "SUPABASE_URL_FAMILIA", "keyEnv": "SUPABASE_SERVICE_KEY_FAMILIA", "isPrimary": false },
+  { "name": "scib",    "urlEnv": "SUPABASE_URL_SCIB",    "keyEnv": "SUPABASE_SERVICE_KEY_SCIB",    "isPrimary": false }
 ]

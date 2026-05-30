@@ -20,6 +20,12 @@ if (hostname.includes('bolaofamilia') || hostname.includes('bolao-familia')) {
     const link = document.querySelector(sel);
     if (link) link.href = '/favicon-familia.svg';
   }
+} else if (hostname.includes('bolao-scib') || hostname.includes('bolaoscib')) {
+  document.title = 'Bolão SCIB 2026';
+  for (const sel of ["link[rel='icon']", "link[rel='apple-touch-icon']"]) {
+    const link = document.querySelector(sel);
+    if (link) link.href = '/favicon-scib.svg';
+  }
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(

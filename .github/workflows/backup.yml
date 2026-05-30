@@ -31,6 +31,8 @@ jobs:
           SUPABASE_SERVICE_KEY_TRUPE:   ${{ secrets.SUPABASE_SERVICE_KEY_TRUPE }}
           SUPABASE_URL_FAMILIA:         ${{ secrets.SUPABASE_URL_FAMILIA }}
           SUPABASE_SERVICE_KEY_FAMILIA: ${{ secrets.SUPABASE_SERVICE_KEY_FAMILIA }}
+          SUPABASE_URL_SCIB:            ${{ secrets.SUPABASE_URL_SCIB }}
+          SUPABASE_SERVICE_KEY_SCIB:    ${{ secrets.SUPABASE_SERVICE_KEY_SCIB }}
         run: node scripts/backup.mjs
 
       - name: Upload artifacts

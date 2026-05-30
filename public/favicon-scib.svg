@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Rose-madder red background (from the 2014 brand palette) -->
+  <rect width="64" height="64" rx="12" fill="#D8131A"/>
+
+  <!-- Trophy left handle -->
+  <path d="M18 22 C11 22, 9 28, 12 33 C13 35, 16 35, 18 33"
+        stroke="#FDD301" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- Trophy right handle -->
+  <path d="M46 22 C53 22, 55 28, 52 33 C51 35, 48 35, 46 33"
+        stroke="#FDD301" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+  <!-- Cup body -->
+  <path d="M18 14 H46 V32 C46 40, 40 44, 32 44 C24 44, 18 40, 18 32 Z" fill="#FDD301"/>
+  <rect x="18" y="14" width="28" height="3" fill="#E4BD00"/>
+
+  <!-- Stem -->
+  <rect x="28" y="44" width="8" height="6" fill="#FDD301"/>
+
+  <!-- Base -->
+  <rect x="18" y="50" width="28" height="5" rx="1.5" fill="#FDD301"/>
+  <rect x="18" y="50" width="28" height="1.5" fill="#E4BD00"/>
+
+  <!-- "S" diferenciador (em vez do coraçãozinho da família) -->
+  <text x="32" y="13" font-family="Poppins, sans-serif" font-weight="800"
+        font-size="9" text-anchor="middle" fill="#FFFFFF">SCIB</text>
+</svg>
