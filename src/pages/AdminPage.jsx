@@ -338,8 +338,7 @@ function ExtrasResults({ teams, current, onSave }) {
     topScorerGoals:   current.topScorerGoals   ?? '',
     firstGoalBrazil:  current.firstGoalBrazil  || '',
     lastGoalBrazil:   current.lastGoalBrazil   || '',
-    hundredthGoal:    current.hundredthGoal    || '',
-    mbappeRecord:     current.mbappeRecord ?? null
+    hundredthGoal:    current.hundredthGoal    || ''
   });
   const update = (k) => (e) => setVals(v => ({ ...v, [k]: e.target.value }));
   const updateNum = (k) => (e) => {
@@ -380,20 +379,6 @@ function ExtrasResults({ teams, current, onSave }) {
         <span>100º gol da copa (jogador)</span>
         <input type="text" value={vals.hundredthGoal} onChange={update('hundredthGoal')} />
       </label>
-      <label className="pred-field">
-        <span>Mbappé bateu o recorde?</span>
-        <select
-          value={vals.mbappeRecord === true ? 'yes' : vals.mbappeRecord === false ? 'no' : ''}
-          onChange={(e) => {
-            const v = e.target.value;
-            setVals(prev => ({ ...prev, mbappeRecord: v === 'yes' ? true : v === 'no' ? false : null }));
-          }}
-        >
-          <option value="">— ainda não definido —</option>
-          <option value="yes">Sim</option>
-          <option value="no">Não</option>
-        </select>
-      </label>
       <div className="pred-confirm__row">
         <Button
           variant="primary"
@@ -404,8 +389,7 @@ function ExtrasResults({ teams, current, onSave }) {
             topScorerGoals:   vals.topScorerGoals === '' ? null : Number(vals.topScorerGoals),
             firstGoalBrazil:  vals.firstGoalBrazil || null,
             lastGoalBrazil:   vals.lastGoalBrazil || null,
-            hundredthGoal:    vals.hundredthGoal || null,
-            mbappeRecord:     vals.mbappeRecord
+            hundredthGoal:    vals.hundredthGoal || null
           })}
         >
           Salvar resultados extras

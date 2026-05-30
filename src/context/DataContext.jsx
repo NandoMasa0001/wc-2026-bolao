@@ -216,10 +216,13 @@ function MockDataProvider({ children }) {
 
   const saveExtras = useCallback(async (extras) => {
     if (!session) return;
-    setExtraPredictions((prev) => ({
-      ...prev,
-      [session.id]: { ...extras, points: 0 }
-    }));
+    setExtraPredictions((prev) => {
+      const current = prev[session.id] || {};
+      return {
+        ...prev,
+        [session.id]: { ...current, ...extras, points: 0 }
+      };
+    });
   }, [session]);
 
   const updateConfig = useCallback(async (patch) => {
@@ -363,7 +366,6 @@ const fromExtraRow = (r) => ({
   totalGoalsWC:     r.total_goals_wc,
   neymarGA:         r.neymar_ga,
   topScorerGoals:   r.top_scorer_goals,
-  mbappeRecord:     r.mbappe_record,
   points:           r.points
 });
 
@@ -703,21 +705,39 @@ function SupabaseDataProvider({ children }) {
 
   const saveExtras = useCallback(async (extras) => {
     if (!session) return;
+    // Partial update: only override fields that are explicitly present in
+    // `extras`. Fields not passed get preserved from the existing row.
     const numOrNull = (v) => (v === '' || v == null ? null : Number(v));
+    const KEYMAP = {
+      champion:        'champion',
+      firstGoalBrazil: 'first_goal_brazil',
+      lastGoalBrazil:  'last_goal_brazil',
+      hundredthGoal:   'hundredth_goal',
+      totalGoalsWC:    'total_goals_wc',
+      neymarGA:        'neymar_ga',
+      topScorerGoals:  'top_scorer_goals'
+    };
+    const NUMERIC = new Set(['totalGoalsWC','neymarGA','topScorerGoals']);
+
+    // Fetch existing so we can merge.
+    const { data: existing } = await supabase
+      .from('extra_predictions')
+      .select('*')
+      .eq('player_id', session.id)
+      .maybeSingle();
+
+    const merged = { ...(existing || { player_id: session.id }), points: 0 };
+    for (const [camelKey, snakeKey] of Object.entries(KEYMAP)) {
+      if (Object.prototype.hasOwnProperty.call(extras, camelKey)) {
+        const val = extras[camelKey];
+        merged[snakeKey] = NUMERIC.has(camelKey) ? numOrNull(val) : (val || null);
+      }
+    }
+    delete merged.mbappe_record; // legacy column — leave nullable in DB, just don't write to it
+
     const { error } = await supabase
       .from('extra_predictions')
-      .upsert({
-        player_id: session.id,
-        champion:           extras.champion          || null,
-        first_goal_brazil:  extras.firstGoalBrazil   || null,
-        last_goal_brazil:   extras.lastGoalBrazil    || null,
-        hundredth_goal:     extras.hundredthGoal     || null,
-        total_goals_wc:     numOrNull(extras.totalGoalsWC),
-        neymar_ga:          numOrNull(extras.neymarGA),
-        top_scorer_goals:   numOrNull(extras.topScorerGoals),
-        mbappe_record:      typeof extras.mbappeRecord === 'boolean' ? extras.mbappeRecord : null,
-        points: 0
-      }, { onConflict: 'player_id' });
+      .upsert(merged, { onConflict: 'player_id' });
     if (error) console.error('saveExtras', error);
   }, [session]);
 

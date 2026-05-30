@@ -39,6 +39,7 @@ function dayKey(iso) {
 export default function MatchesPage() {
   const {
     matches, teamsByCode, predictionsByMatchForMe, predictions,
+    finalsPredictions, awardPredictions, pollPredictions, extraPredictions,
     players, me, config, savePrediction
   } = useData();
   const { show } = useToast();
@@ -150,6 +151,15 @@ export default function MatchesPage() {
         </Link>
       </div>
 
+      <SpecialsBanner
+        me={me}
+        tournamentStartsAt={config?.tournamentStartsAt}
+        finals={me ? finalsPredictions[me.id] : null}
+        awards={me ? awardPredictions[me.id] : null}
+        poll={me ? pollPredictions[me.id] : null}
+        extras={me ? extraPredictions[me.id] : null}
+      />
+
       <div className="matches-filter" role="group" aria-label="Filtrar por fase">
         {FILTERS.map(({ key, label }) => (
           <button
@@ -235,5 +245,64 @@ export default function MatchesPage() {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Banner reminding the user that there are tournament-long predictions
+ * beyond the 104 group-stage games. Hides once they've started filling
+ * any (or once they manually dismiss, or once the tournament locks).
+ */
+function SpecialsBanner({ me, tournamentStartsAt, finals, awards, poll, extras }) {
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem('specials-banner-dismissed') === '1'; }
+    catch { return false; }
+  });
+  if (dismissed) return null;
+  if (!me) return null;
+
+  const tournamentStarted = tournamentStartsAt
+    ? new Date(tournamentStartsAt).getTime() <= Date.now()
+    : false;
+  if (tournamentStarted) return null;
+
+  const hasAny =
+    !!(finals?.finalists?.length) ||
+    !!(awards && (awards.bestPlayer || awards.youngPlayer || awards.goalkeeper || awards.topScorer)) ||
+    !!(poll?.darkHorse || poll?.disappointment) ||
+    !!(extras && (extras.champion || extras.totalGoalsWC != null || extras.neymarGA != null ||
+                  extras.topScorerGoals != null || extras.firstGoalBrazil || extras.lastGoalBrazil ||
+                  extras.hundredthGoal));
+  if (hasAny) return null;
+
+  const dismiss = () => {
+    try { localStorage.setItem('specials-banner-dismissed', '1'); } catch { /* ignore */ }
+    setDismissed(true);
+  };
+
+  return (
+    <div className="specials-banner" role="region" aria-label="Lembrete de palpites especiais">
+      <div className="specials-banner__body">
+        <span className="specials-banner__icon" aria-hidden="true">🏆</span>
+        <span className="specials-banner__text">
+          <strong>Não esqueça os palpites especiais!</strong>
+          {' '}
+          Campeão, finalistas, prêmios individuais, zebra e mais — todos travam junto no apito inicial.
+        </span>
+      </div>
+      <div className="specials-banner__actions">
+        <Link to="/palpites?tab=especiais" className="specials-banner__cta">
+          Fazer agora →
+        </Link>
+        <button
+          type="button"
+          onClick={dismiss}
+          className="specials-banner__close"
+          aria-label="Fechar lembrete"
+        >
+          ×
+        </button>
+      </div>
+    </div>
   );
 }

@@ -366,8 +366,7 @@ async function runForLeague({ league, apiMatches, championOdds, primaryResults }
         hundredthGoal: er.hundredth_goal,
         totalGoalsWC: er.total_goals_wc,
         neymarGA: er.neymar_ga,
-        topScorerGoals: er.top_scorer_goals,
-        mbappeRecord: er.mbappe_record
+        topScorerGoals: er.top_scorer_goals
       };
       const extrasActual = {
         champion: results.champion,
@@ -376,8 +375,7 @@ async function runForLeague({ league, apiMatches, championOdds, primaryResults }
         hundredthGoal: results.hundredthGoal,
         totalGoalsWC: results.totalGoalsWC,
         neymarGA: results.neymarGA,
-        topScorerGoals: results.topScorerGoals,
-        mbappeRecord: results.mbappeRecord
+        topScorerGoals: results.topScorerGoals
       };
       extras = scoreExtras(camelPred, extrasActual, teamBoosts);
       if (er.points !== extras) extraUpdates.push({ ...er, points: extras });

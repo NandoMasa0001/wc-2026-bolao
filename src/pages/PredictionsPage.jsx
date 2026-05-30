@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Card from '../components/Card.jsx';
 import Button from '../components/Button.jsx';
 import GroupTable from '../components/GroupTable.jsx';
@@ -13,10 +14,7 @@ import './PredictionsPage.css';
 
 const TABS = [
   { key: 'advancement', label: 'Classificação' },
-  { key: 'finalists',   label: 'Finalistas' },
-  { key: 'awards',      label: 'Prêmios' },
-  { key: 'poll',        label: 'Zebra' },
-  { key: 'extras',      label: 'Extras' }
+  { key: 'especiais',   label: 'Especiais' }
 ];
 
 export default function PredictionsPage() {
@@ -28,8 +26,22 @@ export default function PredictionsPage() {
     me, confirmAdvancement, saveFinalists, saveAwards, savePollPrediction, saveExtras
   } = useData();
   const { show } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [tab, setTab] = useState('advancement');
+  const [tab, setTab] = useState(() => {
+    const t = searchParams.get('tab');
+    return TABS.some(x => x.key === t) ? t : 'advancement';
+  });
+
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (TABS.some(x => x.key === t) && t !== tab) setTab(t);
+  }, [searchParams, tab]);
+
+  const switchTab = (key) => {
+    setTab(key);
+    setSearchParams({ tab: key }, { replace: true });
+  };
 
   return (
     <>
@@ -42,7 +54,7 @@ export default function PredictionsPage() {
             key={key}
             aria-pressed={tab === key}
             className={'chip' + (tab === key ? ' chip--active' : '')}
-            onClick={() => setTab(key)}
+            onClick={() => switchTab(key)}
           >
             {label}
           </button>
@@ -65,48 +77,18 @@ export default function PredictionsPage() {
         />
       )}
 
-      {tab === 'finalists' && (
-        <FinalistsTab
-          teams={teams}
-          current={me ? finalsPredictions[me.id] : null}
-          teamBoosts={teamBoosts}
-          onSave={(arr) => {
-            saveFinalists(arr);
-            show('Finalistas salvos', { variant: 'success' });
-          }}
-        />
-      )}
-
-      {tab === 'awards' && (
-        <AwardsTab
-          current={me ? awardPredictions[me.id] : null}
-          onSave={(vals) => {
-            saveAwards(vals);
-            show('Prêmios salvos', { variant: 'success' });
-          }}
-        />
-      )}
-
-      {tab === 'poll' && (
-        <PollTab
-          teams={teams}
-          current={me ? pollPredictions[me.id] : null}
-          onSave={(vals) => {
-            savePollPrediction(vals);
-            show('Zebra salva', { variant: 'success' });
-          }}
-        />
-      )}
-
-      {tab === 'extras' && (
-        <ExtrasTab
+      {tab === 'especiais' && (
+        <EspeciaisTab
           teams={teams}
           teamBoosts={teamBoosts}
-          current={me ? extraPredictions[me.id] : null}
-          onSave={(vals) => {
-            saveExtras(vals);
-            show('Extras salvos', { variant: 'success' });
-          }}
+          finalsCurrent={me ? finalsPredictions[me.id] : null}
+          awardsCurrent={me ? awardPredictions[me.id] : null}
+          pollCurrent={me ? pollPredictions[me.id] : null}
+          extrasCurrent={me ? extraPredictions[me.id] : null}
+          onSaveFinalists={(arr) => { saveFinalists(arr); show('Finalistas salvos', { variant: 'success' }); }}
+          onSaveAwards={(vals) => { saveAwards(vals); show('Prêmios salvos', { variant: 'success' }); }}
+          onSavePoll={(vals) => { savePollPrediction(vals); show('Zebra salva', { variant: 'success' }); }}
+          onSaveExtras={(vals) => { saveExtras(vals); show('Extras salvos', { variant: 'success' }); }}
         />
       )}
     </>
@@ -358,6 +340,187 @@ function BracketCenter({ final, third, teamsByCode }) {
 /* Finalists                                                              */
 /* ====================================================================== */
 
+/* ====================================================================== */
+/* EspeciaisTab — wrapper combining Finalistas, Prêmios, Zebra, Extras    */
+/* into a single scrollable page with clear section headings.             */
+/* ====================================================================== */
+
+function EspeciaisTab({
+  teams, teamBoosts,
+  finalsCurrent, awardsCurrent, pollCurrent, extrasCurrent,
+  onSaveFinalists, onSaveAwards, onSavePoll, onSaveExtras
+}) {
+  // Progress: how many of the 5 sections have at least one field filled?
+  const progress = useMemo(() => {
+    const sections = {
+      campeao:    !!extrasCurrent?.champion,
+      finalistas: !!(finalsCurrent?.finalists?.length),
+      premios:    !!(awardsCurrent && (awardsCurrent.bestPlayer || awardsCurrent.youngPlayer || awardsCurrent.goalkeeper || awardsCurrent.topScorer)),
+      zebra:      !!(pollCurrent?.darkHorse || pollCurrent?.disappointment),
+      numericas:  !!(extrasCurrent && (extrasCurrent.totalGoalsWC != null || extrasCurrent.neymarGA != null || extrasCurrent.topScorerGoals != null)),
+      quemMarca:  !!(extrasCurrent && (extrasCurrent.firstGoalBrazil || extrasCurrent.lastGoalBrazil || extrasCurrent.hundredthGoal))
+    };
+    const filled = Object.values(sections).filter(Boolean).length;
+    const total = Object.keys(sections).length;
+    return { sections, filled, total };
+  }, [finalsCurrent, awardsCurrent, pollCurrent, extrasCurrent]);
+
+  return (
+    <div className="stack especiais-stack">
+      <Card className="especiais-progress">
+        <strong>{progress.filled}/{progress.total}</strong> seções com pelo menos um palpite preenchido.
+        {progress.filled < progress.total && (
+          <p className="muted">Role pra baixo pra preencher os que faltam — cada bloco salva separadamente.</p>
+        )}
+      </Card>
+
+      <CampeaoSection
+        teams={teams}
+        teamBoosts={teamBoosts}
+        current={extrasCurrent}
+        onSave={(champion) => onSaveExtras({ champion })}
+      />
+
+      <FinalistsTab
+        teams={teams}
+        current={finalsCurrent}
+        teamBoosts={teamBoosts}
+        onSave={onSaveFinalists}
+      />
+
+      <AwardsTab current={awardsCurrent} onSave={onSaveAwards} />
+
+      <PollTab teams={teams} current={pollCurrent} onSave={onSavePoll} />
+
+      <NumericasSection current={extrasCurrent} onSave={onSaveExtras} />
+
+      <QuemMarcaSection current={extrasCurrent} onSave={onSaveExtras} />
+    </div>
+  );
+}
+
+function CampeaoSection({ teams, teamBoosts, current, onSave }) {
+  const [champion, setChampion] = useState(current?.champion || '');
+  const sortedTeams = useMemo(() => {
+    return [...teams].sort((a, b) => {
+      const ba = teamBoosts[a.code];
+      const bb = teamBoosts[b.code];
+      if (ba == null && bb == null) return a.name.localeCompare(b.name, 'pt-BR');
+      if (ba == null) return 1;
+      if (bb == null) return -1;
+      return ba - bb;
+    });
+  }, [teams, teamBoosts]);
+  const championBoost = champion ? (teamBoosts[champion] || 1) : 1;
+
+  return (
+    <Card>
+      <h3 className="pred-section-title">O campeão</h3>
+      <p className="muted">
+        A seleção que levanta a taça. <strong>30 pts × multiplicador da seleção</strong> (favoritos = 1×, zebras até 2.5×). Independente de quem é finalista.
+      </p>
+      <label className="pred-field">
+        <span>Campeão da Copa</span>
+        <select value={champion} onChange={(e) => setChampion(e.target.value)}>
+          <option value="">— escolha —</option>
+          {sortedTeams.map(t => (
+            <option key={t.code} value={t.code}>
+              {t.name} ({t.code}){teamBoosts[t.code] && teamBoosts[t.code] > 1.05 ? ` — × ${teamBoosts[t.code].toFixed(2)}` : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+      {champion && championBoost > 1.05 && (
+        <p className="muted">
+          Se acertar: <strong>{Math.ceil(30 * championBoost)} pts</strong>
+        </p>
+      )}
+      <div className="pred-confirm__row">
+        <Button variant="primary" onClick={() => onSave(champion || null)} disabled={!champion}>
+          Salvar campeão
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function NumericasSection({ current, onSave }) {
+  const [vals, setVals] = useState({
+    totalGoalsWC:   current?.totalGoalsWC   ?? '',
+    neymarGA:       current?.neymarGA       ?? '',
+    topScorerGoals: current?.topScorerGoals ?? ''
+  });
+  const updateNum = (k) => (e) => {
+    const v = e.target.value.replace(/[^\d]/g, '');
+    setVals(prev => ({ ...prev, [k]: v }));
+  };
+  const handleSave = () => onSave({
+    totalGoalsWC:    vals.totalGoalsWC    === '' ? null : Number(vals.totalGoalsWC),
+    neymarGA:        vals.neymarGA        === '' ? null : Number(vals.neymarGA),
+    topScorerGoals:  vals.topScorerGoals  === '' ? null : Number(vals.topScorerGoals)
+  });
+
+  return (
+    <Card>
+      <h3 className="pred-section-title">Apostas numéricas</h3>
+      <p className="muted">
+        Exato = pontuação máxima, <strong>−5 pts por gol de diferença</strong>, mínimo 0.
+      </p>
+      <label className="pred-field">
+        <span>Total de gols na Copa (60 pts)</span>
+        <input type="text" inputMode="numeric" value={vals.totalGoalsWC} onChange={updateNum('totalGoalsWC')} placeholder="ex: 172" />
+      </label>
+      <label className="pred-field">
+        <span>Gols + assistências do Neymar (30 pts)</span>
+        <input type="text" inputMode="numeric" value={vals.neymarGA} onChange={updateNum('neymarGA')} placeholder="ex: 5" />
+      </label>
+      <label className="pred-field">
+        <span>Nº de gols do artilheiro da copa (20 pts)</span>
+        <input type="text" inputMode="numeric" value={vals.topScorerGoals} onChange={updateNum('topScorerGoals')} placeholder="ex: 8" />
+      </label>
+      <div className="pred-confirm__row">
+        <Button variant="primary" onClick={handleSave}>Salvar numéricas</Button>
+      </div>
+    </Card>
+  );
+}
+
+function QuemMarcaSection({ current, onSave }) {
+  const [vals, setVals] = useState({
+    firstGoalBrazil: current?.firstGoalBrazil || '',
+    lastGoalBrazil:  current?.lastGoalBrazil  || '',
+    hundredthGoal:   current?.hundredthGoal   || ''
+  });
+  const update = (k) => (e) => setVals(prev => ({ ...prev, [k]: e.target.value }));
+  const handleSave = () => onSave({
+    firstGoalBrazil: vals.firstGoalBrazil || null,
+    lastGoalBrazil:  vals.lastGoalBrazil  || null,
+    hundredthGoal:   vals.hundredthGoal   || null
+  });
+
+  return (
+    <Card>
+      <h3 className="pred-section-title">Quem marca o gol</h3>
+      <p className="muted">Texto livre — tem que bater exato com o nome do jogador.</p>
+      <label className="pred-field">
+        <span>Primeiro gol do Brasil na copa (30 pts)</span>
+        <input type="text" value={vals.firstGoalBrazil} onChange={update('firstGoalBrazil')} placeholder="ex: Vinícius Jr." />
+      </label>
+      <label className="pred-field">
+        <span>Último gol do Brasil na copa (20 pts)</span>
+        <input type="text" value={vals.lastGoalBrazil} onChange={update('lastGoalBrazil')} placeholder="ex: Rodrygo" />
+      </label>
+      <label className="pred-field">
+        <span>100º gol da copa (50 pts)</span>
+        <input type="text" value={vals.hundredthGoal} onChange={update('hundredthGoal')} placeholder="quem marca?" />
+      </label>
+      <div className="pred-confirm__row">
+        <Button variant="primary" onClick={handleSave}>Salvar quem marca</Button>
+      </div>
+    </Card>
+  );
+}
+
 function FinalistsTab({ teams, current, teamBoosts = {}, onSave }) {
   const [picks, setPicks] = useState(current?.finalists || []);
 
@@ -537,171 +700,4 @@ function PollTab({ teams, current, onSave }) {
   );
 }
 
-/* ====================================================================== */
-/* Extras (8 side bets)                                                   */
-/* ====================================================================== */
-
-function ExtrasTab({ teams, teamBoosts = {}, current, onSave }) {
-  const [vals, setVals] = useState({
-    champion:         current?.champion         || '',
-    totalGoalsWC:     current?.totalGoalsWC     ?? '',
-    neymarGA:         current?.neymarGA         ?? '',
-    topScorerGoals:   current?.topScorerGoals   ?? '',
-    firstGoalBrazil:  current?.firstGoalBrazil  || '',
-    lastGoalBrazil:   current?.lastGoalBrazil   || '',
-    hundredthGoal:    current?.hundredthGoal    || '',
-    mbappeRecord:     current?.mbappeRecord ?? null
-  });
-
-  const update = (k) => (e) => setVals(v => ({ ...v, [k]: e.target.value }));
-  const updateNum = (k) => (e) => {
-    const v = e.target.value.replace(/[^\d]/g, '');
-    setVals(prev => ({ ...prev, [k]: v }));
-  };
-
-  // Order teams by favouritism (same logic as Finalists tab).
-  const sortedTeams = useMemo(() => {
-    return [...teams].sort((a, b) => {
-      const ba = teamBoosts[a.code];
-      const bb = teamBoosts[b.code];
-      if (ba == null && bb == null) return a.name.localeCompare(b.name, 'pt-BR');
-      if (ba == null) return 1;
-      if (bb == null) return -1;
-      return ba - bb;
-    });
-  }, [teams, teamBoosts]);
-
-  const championBoost = vals.champion ? (teamBoosts[vals.champion] || 1) : 1;
-
-  return (
-    <div className="stack">
-      <Card>
-        <h3 className="pred-section-title">O campeão</h3>
-        <p className="muted">
-          A seleção que levanta a taça. <strong>30 pts × multiplicador da seleção</strong> (favoritos = 1×, zebras até 2.5×). Independente de quem é finalista.
-        </p>
-        <label className="pred-field">
-          <span>Campeão da Copa</span>
-          <select value={vals.champion} onChange={update('champion')}>
-            <option value="">— escolha —</option>
-            {sortedTeams.map(t => (
-              <option key={t.code} value={t.code}>
-                {t.name} ({t.code}){teamBoosts[t.code] && teamBoosts[t.code] > 1.05 ? ` — × ${teamBoosts[t.code].toFixed(2)}` : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-        {vals.champion && championBoost > 1.05 && (
-          <p className="muted">
-            Se acertar: <strong>{Math.ceil(30 * championBoost)} pts</strong>
-          </p>
-        )}
-      </Card>
-
-      <Card>
-        <h3 className="pred-section-title">Apostas numéricas</h3>
-        <p className="muted">
-          Exato = pontuação máxima, <strong>−5 pts por gol de diferença</strong>, mínimo 0.
-        </p>
-        <label className="pred-field">
-          <span>Total de gols na Copa (60 pts)</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={vals.totalGoalsWC}
-            onChange={updateNum('totalGoalsWC')}
-            placeholder="ex: 172"
-          />
-        </label>
-        <label className="pred-field">
-          <span>Gols + assistências do Neymar (30 pts)</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={vals.neymarGA}
-            onChange={updateNum('neymarGA')}
-            placeholder="ex: 5"
-          />
-        </label>
-        <label className="pred-field">
-          <span>Nº de gols do artilheiro da copa (20 pts)</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={vals.topScorerGoals}
-            onChange={updateNum('topScorerGoals')}
-            placeholder="ex: 8"
-          />
-        </label>
-      </Card>
-
-      <Card>
-        <h3 className="pred-section-title">Quem marca</h3>
-        <p className="muted">
-          Texto livre — tem que bater exato com o nome do jogador.
-        </p>
-        <label className="pred-field">
-          <span>Primeiro gol do Brasil na copa (30 pts)</span>
-          <input
-            type="text"
-            value={vals.firstGoalBrazil}
-            onChange={update('firstGoalBrazil')}
-            placeholder="ex: Vinícius Jr."
-          />
-        </label>
-        <label className="pred-field">
-          <span>Último gol do Brasil na copa (20 pts)</span>
-          <input
-            type="text"
-            value={vals.lastGoalBrazil}
-            onChange={update('lastGoalBrazil')}
-            placeholder="ex: Rodrygo"
-          />
-        </label>
-        <label className="pred-field">
-          <span>100º gol da copa (50 pts)</span>
-          <input
-            type="text"
-            value={vals.hundredthGoal}
-            onChange={update('hundredthGoal')}
-            placeholder="quem marca?"
-          />
-        </label>
-      </Card>
-
-      <Card>
-        <h3 className="pred-section-title">Sim ou não</h3>
-        <p className="muted">15 pts cada.</p>
-        <label className="pred-field">
-          <span>Mbappé bate o recorde de gols em copas?</span>
-          <select
-            value={vals.mbappeRecord === true ? 'yes' : vals.mbappeRecord === false ? 'no' : ''}
-            onChange={(e) => {
-              const v = e.target.value;
-              setVals(prev => ({ ...prev, mbappeRecord: v === 'yes' ? true : v === 'no' ? false : null }));
-            }}
-          >
-            <option value="">— não opinei —</option>
-            <option value="yes">Sim</option>
-            <option value="no">Não</option>
-          </select>
-        </label>
-      </Card>
-
-      <div className="pred-confirm__row">
-        <Button
-          variant="primary"
-          onClick={() => onSave({
-            ...vals,
-            totalGoalsWC:    vals.totalGoalsWC    === '' ? null : Number(vals.totalGoalsWC),
-            neymarGA:        vals.neymarGA        === '' ? null : Number(vals.neymarGA),
-            topScorerGoals:  vals.topScorerGoals  === '' ? null : Number(vals.topScorerGoals)
-          })}
-        >
-          Salvar extras
-        </Button>
-      </div>
-    </div>
-  );
-}
 

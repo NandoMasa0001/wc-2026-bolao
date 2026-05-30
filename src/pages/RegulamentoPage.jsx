@@ -209,7 +209,6 @@ export default function RegulamentoPage() {
               <tr><td>Primeiro gol do Brasil</td><td>Jogador (texto)</td><td className="ta-c">30</td></tr>
               <tr><td>Último gol do Brasil</td><td>Jogador (texto)</td><td className="ta-c">20</td></tr>
               <tr><td>100º gol da copa</td><td>Jogador (texto)</td><td className="ta-c">50</td></tr>
-              <tr><td>Mbappé bate recorde de gols?</td><td>Sim / não</td><td className="ta-c">15</td></tr>
             </tbody>
           </table>
         </div>

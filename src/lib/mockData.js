@@ -48,8 +48,7 @@ export const mockConfig = {
     hundredthGoal:   null,
     totalGoalsWC:    null,
     neymarGA:        null,
-    topScorerGoals:  null,
-    mbappeRecord:    null
+    topScorerGoals:  null
   },
   // Championship outright (implied probability per team). Used to derive
   // per-team boosts for tournament-long bets (advancement, finalists).

@@ -268,9 +268,6 @@ export function scoreExtras(predicted = {}, actual = {}, teamBoosts = {}) {
   // 7. 100th goal of the WC (50 pts)
   total += scoreExactText(predicted.hundredthGoal, actual.hundredthGoal, 50);
 
-  // 8. Does Mbappé break the goals record? (15 pts)
-  total += scoreBoolean(predicted.mbappeRecord, actual.mbappeRecord, 15);
-
   return total;
 }
 

@@ -68,7 +68,13 @@ async function main() {
       goalkeeper: null,
       topScorer: null,
       darkHorse: null,
-      disappointment: null
+      disappointment: null,
+      firstGoalBrazil: null,
+      lastGoalBrazil: null,
+      hundredthGoal: null,
+      totalGoalsWC: null,
+      neymarGA: null,
+      topScorerGoals: null
     },
     tournament_odds: {}
   });
