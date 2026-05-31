@@ -101,6 +101,49 @@
   background: rgba(26, 34, 48, 0.08);
 }
 
+/* Persistent pending-predictions nudge (count of unconfirmed especiais). */
+.pending-nudge {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-blue-soft);
+  border: 1px solid rgba(0, 73, 144, 0.18);
+  border-radius: var(--r-md);
+  text-decoration: none;
+  color: var(--text-primary);
+  font-size: var(--fs-small);
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.pending-nudge:hover {
+  background: rgba(0, 73, 144, 0.16);
+  text-decoration: none;
+}
+
+.pending-nudge__icon {
+  font-size: var(--fs-h3);
+  flex-shrink: 0;
+}
+
+.pending-nudge__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pending-nudge__text strong {
+  color: var(--c-blue);
+  font-weight: var(--fw-bold);
+}
+
+.pending-nudge__arrow {
+  color: var(--c-blue);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-h3);
+  flex-shrink: 0;
+}
+
 
 .matches-filter {
   display: flex;

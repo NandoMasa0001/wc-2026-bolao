@@ -40,6 +40,7 @@ export default function MatchesPage() {
   const {
     matches, teamsByCode, predictionsByMatchForMe, predictions,
     finalsPredictions, awardPredictions, pollPredictions, extraPredictions,
+    advancementPredictions,
     players, me, config, savePrediction
   } = useData();
   const { show } = useToast();
@@ -153,6 +154,15 @@ export default function MatchesPage() {
 
       <SpecialsBanner
         me={me}
+        tournamentStartsAt={config?.tournamentStartsAt}
+        finals={me ? finalsPredictions[me.id] : null}
+        awards={me ? awardPredictions[me.id] : null}
+        poll={me ? pollPredictions[me.id] : null}
+        extras={me ? extraPredictions[me.id] : null}
+      />
+      <PendingNudge
+        me={me}
+        advancementPred={me ? advancementPredictions[me.id] : null}
         tournamentStartsAt={config?.tournamentStartsAt}
         finals={me ? finalsPredictions[me.id] : null}
         awards={me ? awardPredictions[me.id] : null}
@@ -304,5 +314,49 @@ function SpecialsBanner({ me, tournamentStartsAt, finals, awards, poll, extras }
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Persistent nudge showing the count of tournament-long predictions still
+ * pending. Differs from SpecialsBanner: SpecialsBanner is a one-time
+ * onboarding that hides as soon as the user fills any especial; this one
+ * stays as long as anything is still missing, because it's easy to fill
+ * one and forget the other six. Hides after tournament start (everything
+ * locks, no point nagging).
+ */
+function PendingNudge({
+  me, tournamentStartsAt, advancementPred,
+  finals, awards, poll, extras
+}) {
+  if (!me) return null;
+  const tournamentStarted = tournamentStartsAt
+    ? new Date(tournamentStartsAt).getTime() <= Date.now()
+    : false;
+  if (tournamentStarted) return null;
+
+  const checks = {
+    advancement: !!(advancementPred && advancementPred.teams && advancementPred.teams.length > 0),
+    champion:    !!extras?.champion,
+    finalists:   finals?.finalists?.length === 2,
+    awards:      !!(awards && (awards.bestPlayer || awards.youngPlayer || awards.goalkeeper || awards.topScorer)),
+    poll:        !!(poll && (poll.darkHorse || poll.disappointment)),
+    numericas:   !!(extras && (extras.totalGoalsWC != null || extras.neymarGA != null || extras.topScorerGoals != null)),
+    quemmarca:   !!(extras && (extras.firstGoalBrazil || extras.lastGoalBrazil || extras.hundredthGoal))
+  };
+  const total = Object.keys(checks).length;
+  const done = Object.values(checks).filter(Boolean).length;
+  const pending = total - done;
+  if (pending === 0) return null;
+
+  return (
+    <Link to="/palpites" className="pending-nudge" role="region" aria-label="Palpites pendentes">
+      <span className="pending-nudge__icon" aria-hidden="true">📝</span>
+      <span className="pending-nudge__text">
+        <strong>{pending} {pending === 1 ? 'palpite pendente' : 'palpites pendentes'}</strong>
+        {' '}— toque pra ver a lista de confirmações que faltam.
+      </span>
+      <span className="pending-nudge__arrow" aria-hidden="true">→</span>
+    </Link>
   );
 }

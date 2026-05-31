@@ -5,6 +5,116 @@
   margin-bottom: var(--sp-4);
 }
 
+/* ===== PendingChecklist — top-of-page nag ============================ */
+
+.pending-checklist {
+  background: var(--c-orange-soft, rgba(247, 149, 22, 0.10));
+  border: 1px solid rgba(247, 149, 22, 0.35);
+  margin-bottom: var(--sp-4);
+}
+
+.pending-checklist__intro {
+  font-size: var(--fs-small);
+  margin-bottom: var(--sp-3);
+}
+
+.pending-checklist__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.pending-checklist__row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto auto;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-surface);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+}
+
+.pending-checklist__row--ok {
+  opacity: 0.62;
+}
+
+.pending-checklist__row--stale {
+  border-color: var(--warning, var(--c-orange));
+  background: rgba(247, 149, 22, 0.08);
+}
+
+.pending-checklist__icon {
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-size: var(--fs-h3);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.pending-checklist__row--ok .pending-checklist__icon {
+  color: var(--c-green);
+}
+
+.pending-checklist__row--stale .pending-checklist__icon {
+  color: var(--c-orange);
+}
+
+.pending-checklist__label {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-body);
+  color: var(--text-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pending-checklist__hint {
+  font-size: var(--fs-tiny);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: var(--fw-semibold);
+}
+
+.pending-checklist__row--stale .pending-checklist__hint {
+  color: var(--c-orange);
+}
+
+.pending-checklist__cta {
+  background: var(--c-blue);
+  color: #fff;
+  border: 0;
+  border-radius: var(--r-pill);
+  padding: 4px var(--sp-3);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+  min-height: 32px;
+  white-space: nowrap;
+}
+
+.pending-checklist__cta:hover {
+  background: var(--c-blue-dark, var(--c-blue));
+  filter: brightness(0.92);
+}
+
+/* Tighter on small screens: hide the hint column when space is tight,
+   the icon + label + CTA carry enough information on their own. */
+@media (max-width: 420px) {
+  .pending-checklist__row {
+    grid-template-columns: 22px 1fr auto;
+  }
+  .pending-checklist__hint {
+    display: none;
+  }
+}
+
 .especiais-stack > * + * {
   margin-top: var(--sp-3);
 }

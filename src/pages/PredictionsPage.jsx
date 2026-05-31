@@ -23,7 +23,7 @@ export default function PredictionsPage() {
     matches, groupMatches, predictionsByMatchForMe,
     advancementPredictions, finalsPredictions, awardPredictions, pollPredictions,
     extraPredictions, teamBoosts,
-    me, confirmAdvancement, saveFinalists, saveAwards, savePollPrediction, saveExtras
+    me, config, confirmAdvancement, saveFinalists, saveAwards, savePollPrediction, saveExtras
   } = useData();
   const { show } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -43,9 +43,35 @@ export default function PredictionsPage() {
     setSearchParams({ tab: key }, { replace: true });
   };
 
+  // Jump to a specific section: switch tab if needed, then scroll the anchor.
+  // Used by the PendingChecklist below.
+  const goToSection = (targetTab, anchorId) => {
+    switchTab(targetTab);
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const el = document.getElementById(anchorId);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 60);
+    });
+  };
+
   return (
     <>
       <h2 className="page-title">Meus palpites</h2>
+
+      <PendingChecklist
+        me={me}
+        config={config}
+        advancementPredictions={advancementPredictions}
+        finalsPredictions={finalsPredictions}
+        awardPredictions={awardPredictions}
+        pollPredictions={pollPredictions}
+        extraPredictions={extraPredictions}
+        predictionsByMatchForMe={predictionsByMatchForMe}
+        groupMatches={groupMatches}
+        teamsByGroup={teamsByGroup}
+        onGo={goToSection}
+      />
 
       <div className="pred-tabs" role="group" aria-label="Seções de palpites">
         {TABS.map(({ key, label }) => (
@@ -92,6 +118,128 @@ export default function PredictionsPage() {
         />
       )}
     </>
+  );
+}
+
+/* ====================================================================== */
+/* PendingChecklist — top-of-page nag listing what still needs a save.    */
+/* Sits above the tabs on /palpites. Hides itself once everything is OK   */
+/* or once the tournament has started (locks → no more edits possible).   */
+/* ====================================================================== */
+
+const CHECKLIST_ITEMS = [
+  { key: 'advancement', label: 'Classificação dos 32', tab: 'advancement', anchor: 'sec-advancement' },
+  { key: 'champion',    label: 'Campeão da Copa',       tab: 'especiais',   anchor: 'sec-campeao'     },
+  { key: 'finalists',   label: 'Finalistas',            tab: 'especiais',   anchor: 'sec-finalistas'  },
+  { key: 'awards',      label: 'Prêmios individuais',   tab: 'especiais',   anchor: 'sec-premios'     },
+  { key: 'poll',        label: 'Zebra & decepção',      tab: 'especiais',   anchor: 'sec-zebra'       },
+  { key: 'numericas',   label: 'Apostas numéricas',     tab: 'especiais',   anchor: 'sec-numericas'   },
+  { key: 'quemmarca',   label: 'Quem marca o gol',      tab: 'especiais',   anchor: 'sec-quemmarca'   }
+];
+
+function PendingChecklist({
+  me, config,
+  advancementPredictions, finalsPredictions, awardPredictions,
+  pollPredictions, extraPredictions,
+  predictionsByMatchForMe, groupMatches, teamsByGroup,
+  onGo
+}) {
+  const statuses = useMemo(() => {
+    if (!me) return null;
+
+    // Advancement: incomplete (missing match picks) → stale (changed since
+    // last confirm) → missing (never confirmed) → ok.
+    const confirmedAdv = advancementPredictions[me.id];
+    const predictedMatches = predictedMatchesFromPlayer({
+      groupMatches, predictionsByMatchId: predictionsByMatchForMe
+    });
+    const standings = computeStandings({ matches: predictedMatches, teamsByGroup });
+    let advStatus;
+    if (standings.missingMatches > 0) {
+      advStatus = confirmedAdv ? 'stale' : 'incomplete';
+    } else if (!confirmedAdv) {
+      advStatus = 'missing';
+    } else {
+      const adv = Array.from(standings.advancing);
+      const ok = confirmedAdv.teams.length === adv.length &&
+                 confirmedAdv.teams.every(t => standings.advancing.has(t));
+      advStatus = ok ? 'ok' : 'stale';
+    }
+
+    const extras = extraPredictions[me.id];
+    const awards = awardPredictions[me.id];
+    const poll   = pollPredictions[me.id];
+    const fin    = finalsPredictions[me.id];
+
+    return {
+      advancement: advStatus,
+      champion:   extras?.champion ? 'ok' : 'missing',
+      finalists:  (fin?.finalists?.length === 2) ? 'ok' : 'missing',
+      awards:     (awards && (awards.bestPlayer || awards.youngPlayer || awards.goalkeeper || awards.topScorer)) ? 'ok' : 'missing',
+      poll:       (poll && (poll.darkHorse || poll.disappointment)) ? 'ok' : 'missing',
+      numericas:  (extras && (extras.totalGoalsWC != null || extras.neymarGA != null || extras.topScorerGoals != null)) ? 'ok' : 'missing',
+      quemmarca:  (extras && (extras.firstGoalBrazil || extras.lastGoalBrazil || extras.hundredthGoal)) ? 'ok' : 'missing'
+    };
+  }, [me, advancementPredictions, finalsPredictions, awardPredictions,
+      pollPredictions, extraPredictions, predictionsByMatchForMe,
+      groupMatches, teamsByGroup]);
+
+  if (!me || !statuses) return null;
+
+  const tournamentStarted = config?.tournamentStartsAt
+    ? new Date(config.tournamentStartsAt).getTime() <= Date.now()
+    : false;
+  if (tournamentStarted) return null;
+
+  const pendingCount = CHECKLIST_ITEMS.filter(it => statuses[it.key] !== 'ok').length;
+  if (pendingCount === 0) return null;
+
+  const hintFor = (status) => {
+    switch (status) {
+      case 'ok':         return 'Confirmado';
+      case 'stale':      return 'Reconfirme';
+      case 'incomplete': return 'Faltam jogos';
+      default:           return 'Falta salvar';
+    }
+  };
+  const iconFor = (status) => {
+    switch (status) {
+      case 'ok':    return '✓';
+      case 'stale': return '⚠';
+      default:      return '○';
+    }
+  };
+
+  return (
+    <Card className="pending-checklist">
+      <h3 className="pred-section-title">
+        Faltam {pendingCount} de {CHECKLIST_ITEMS.length} confirmações
+      </h3>
+      <p className="muted pending-checklist__intro">
+        Tudo trava no apito inicial da Copa. Toque em cada pendência pra ir direto pro botão de salvar.
+      </p>
+      <ul className="pending-checklist__list">
+        {CHECKLIST_ITEMS.map(it => {
+          const s = statuses[it.key];
+          return (
+            <li key={it.key} className={`pending-checklist__row pending-checklist__row--${s}`}>
+              <span className="pending-checklist__icon" aria-hidden="true">{iconFor(s)}</span>
+              <span className="pending-checklist__label">{it.label}</span>
+              <span className="pending-checklist__hint">{hintFor(s)}</span>
+              {s !== 'ok' && (
+                <button
+                  type="button"
+                  className="pending-checklist__cta"
+                  onClick={() => onGo(it.tab, it.anchor)}
+                >
+                  Ir →
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
   );
 }
 
@@ -160,7 +308,7 @@ function AdvancementTab({ groupMatches, allMatches, teamsByCode, teamsByGroup, p
         </div>
       </Card>
 
-      <Card>
+      <Card id="sec-advancement">
         <h3 className="pred-section-title">Seleções que você acha que vão se classificar ({advancingArr.length})</h3>
         <p className="muted">
           Cada acerto vale <strong>5 pts</strong>. Pontuação flat — sem multiplicador.
@@ -414,7 +562,7 @@ function CampeaoSection({ teams, teamBoosts, current, onSave }) {
   const championBoost = champion ? (teamBoosts[champion] || 1) : 1;
 
   return (
-    <Card>
+    <Card id="sec-campeao">
       <h3 className="pred-section-title">O campeão</h3>
       <p className="muted">
         A seleção que levanta a taça. <strong>30 pts × multiplicador da seleção</strong> (favoritos = 1×, zebras até 2.5×). Independente de quem é finalista.
@@ -461,7 +609,7 @@ function NumericasSection({ current, onSave }) {
   });
 
   return (
-    <Card>
+    <Card id="sec-numericas">
       <h3 className="pred-section-title">Apostas numéricas</h3>
       <p className="muted">
         Exato = pontuação máxima, <strong>−5 pts por gol de diferença</strong>, mínimo 0.
@@ -499,7 +647,7 @@ function QuemMarcaSection({ current, onSave }) {
   });
 
   return (
-    <Card>
+    <Card id="sec-quemmarca">
       <h3 className="pred-section-title">Quem marca o gol</h3>
       <p className="muted">Texto livre — tem que bater exato com o nome do jogador.</p>
       <label className="pred-field">
@@ -546,7 +694,7 @@ function FinalistsTab({ teams, current, teamBoosts = {}, onSave }) {
   }, [teams, teamBoosts]);
 
   return (
-    <Card>
+    <Card id="sec-finalistas">
       <h3 className="pred-section-title">Escolha os dois finalistas</h3>
       <p className="muted">
         20 pontos × multiplicador por finalista correto. Em ordem de favoritismo (do favorito ao azarão).
@@ -600,7 +748,7 @@ function AwardsTab({ current, onSave }) {
   const anyFilled = Object.values(vals).some(v => v.trim());
 
   return (
-    <Card>
+    <Card id="sec-premios">
       <h3 className="pred-section-title">Prêmios individuais</h3>
       <p className="muted">
         Texto livre — tem que bater exato com o nome oficial do vencedor (não diferencia maiúscula/minúscula). 20 pontos cada, máx 80.
@@ -665,7 +813,7 @@ function PollTab({ teams, current, onSave }) {
   const [disappointment, setDisappointment] = useState(current?.disappointment || '');
 
   return (
-    <Card>
+    <Card id="sec-zebra">
       <h3 className="pred-section-title">Zebra & decepção</h3>
       <p className="muted">
         Feito antes do mundial. Depois da final, os amigos votam — a seleção mais votada vira a resposta oficial. 15 pontos cada.
