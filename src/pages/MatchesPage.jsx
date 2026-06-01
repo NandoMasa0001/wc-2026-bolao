@@ -301,7 +301,7 @@ function SpecialsBanner({ me, tournamentStartsAt, finals, awards, poll, extras }
         </span>
       </div>
       <div className="specials-banner__actions">
-        <Link to="/palpites?tab=especiais" className="specials-banner__cta">
+        <Link to="/predictions?tab=especiais" className="specials-banner__cta">
           Fazer agora →
         </Link>
         <button
@@ -350,7 +350,7 @@ function PendingNudge({
   if (pending === 0) return null;
 
   return (
-    <Link to="/palpites" className="pending-nudge" role="region" aria-label="Palpites pendentes">
+    <Link to="/predictions" className="pending-nudge" role="region" aria-label="Palpites pendentes">
       <span className="pending-nudge__icon" aria-hidden="true">📝</span>
       <span className="pending-nudge__text">
         <strong>{pending} {pending === 1 ? 'palpite pendente' : 'palpites pendentes'}</strong>
