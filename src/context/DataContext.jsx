@@ -633,18 +633,24 @@ function SupabaseDataProvider({ children }) {
     if (!session) return;
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
+    const payload = {
+      player_id: session.id,
+      match_id: matchId,
+      stage: match.stage,
+      home_score: homeScore,
+      away_score: awayScore,
+      points: 0,
+      updated_at: new Date().toISOString()
+    };
+    // Only include `advancer` when it actually has a value. Some leagues
+    // haven't applied migration 0007 yet, so the column doesn't exist
+    // there — sending `advancer: null` would make the whole upsert fail
+    // with "column does not exist". For group matches advancer is always
+    // null anyway, and knockouts don't unlock until the group stage ends.
+    if (advancer != null) payload.advancer = advancer;
     const { error } = await supabase
       .from('predictions')
-      .upsert({
-        player_id: session.id,
-        match_id: matchId,
-        stage: match.stage,
-        home_score: homeScore,
-        away_score: awayScore,
-        advancer: advancer ?? null,
-        points: 0,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'player_id,match_id' });
+      .upsert(payload, { onConflict: 'player_id,match_id' });
     if (error) console.error('savePrediction', error);
   }, [session, matches]);
 
