@@ -2,7 +2,7 @@ name: backup
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # 06:00 UTC daily
+    - cron: '0 6 */3 * *'  # 06:00 UTC, every 3 days
   workflow_dispatch:
 
 concurrency:

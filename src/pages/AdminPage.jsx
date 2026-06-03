@@ -9,7 +9,47 @@ import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { useToast } from '../components/Toast.jsx';
+import { supabase } from '../supabase.js';
 import './AdminPage.css';
+
+const BACKUP_TABLES = [
+  'config', 'teams', 'matches', 'players',
+  'predictions', 'advancement_predictions', 'finals_predictions',
+  'award_predictions', 'poll_predictions', 'poll_votes', 'extra_predictions'
+];
+
+function leagueFromHost() {
+  const h = typeof window !== 'undefined' ? window.location.hostname : '';
+  if (h.includes('bolaofamilia') || h.includes('bolao-familia')) return 'familia';
+  if (h.includes('bolao-scib')   || h.includes('bolaoscib'))     return 'scib';
+  if (h.includes('bolaotrupe'))                                  return 'trupe';
+  return 'manual';
+}
+
+async function downloadFullBackup() {
+  const dump = {
+    league: leagueFromHost(),
+    dumpedAt: new Date().toISOString(),
+    schemaVersion: 6,
+    tables: {}
+  };
+  for (const t of BACKUP_TABLES) {
+    const { data, error } = await supabase.from(t).select('*');
+    if (error) throw new Error(`${t}: ${error.message}`);
+    dump.tables[t] = data;
+  }
+  const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+  a.download = `backup-${dump.league}-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return BACKUP_TABLES.map(t => ({ table: t, rows: dump.tables[t]?.length || 0 }));
+}
 
 export default function AdminPage() {
   const { session } = useAuth();
@@ -92,6 +132,11 @@ export default function AdminPage() {
       </section>
 
       <section className="page-section">
+        <h3 className="page-section__title">Backup & restauração</h3>
+        <BackupSection show={show} />
+      </section>
+
+      <section className="page-section">
         <h3 className="page-section__title">Recalcular</h3>
         <Card>
           <p className="muted">
@@ -108,6 +153,52 @@ export default function AdminPage() {
         </Card>
       </section>
     </>
+  );
+}
+
+function BackupSection({ show }) {
+  const [busy, setBusy] = useState(false);
+  const [lastReport, setLastReport] = useState(null);
+  const handle = async () => {
+    setBusy(true);
+    try {
+      const report = await downloadFullBackup();
+      setLastReport(report);
+      show('Backup baixado', { variant: 'success' });
+    } catch (e) {
+      console.error(e);
+      show(`Erro no backup: ${e.message}`, { variant: 'danger' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card>
+      <p className="muted">
+        Baixa um JSON com tudo da liga: config, times, jogos, jogadores, palpites,
+        avanços, finalistas, prêmios, zebra, votos e extras. Mesmo formato do
+        backup automático diário (GitHub Actions).
+      </p>
+      <div style={{ marginTop: 'var(--sp-3)' }}>
+        <Button variant="secondary" onClick={handle} loading={busy}>
+          Baixar backup completo (.json)
+        </Button>
+      </div>
+      {lastReport && (
+        <ul style={{ marginTop: 'var(--sp-3)', fontSize: 'var(--fs-small)', paddingLeft: 'var(--sp-4)' }}>
+          {lastReport.map(r => (
+            <li key={r.table}><strong>{r.table}</strong>: {r.rows} linhas</li>
+          ))}
+        </ul>
+      )}
+      <p className="muted" style={{ marginTop: 'var(--sp-3)', fontSize: 'var(--fs-small)' }}>
+        <strong>Pra restaurar</strong>, rode no terminal local (precisa da SUPABASE_SERVICE_KEY desta liga):
+        <br />
+        <code style={{ background: 'var(--bg-app)', padding: '2px 6px', borderRadius: 4 }}>
+          node --env-file=.env.&lt;liga&gt; scripts/restore.mjs &lt;arquivo.json&gt; --yes
+        </code>
+      </p>
+    </Card>
   );
 }
 
