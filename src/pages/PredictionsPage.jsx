@@ -5,7 +5,6 @@ import Button from '../components/Button.jsx';
 import GroupTable from '../components/GroupTable.jsx';
 import TeamChip from '../components/TeamChip.jsx';
 import Pill from '../components/Pill.jsx';
-import Modal from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { computeStandings, predictedMatchesFromPlayer } from '../lib/standings.js';
@@ -47,7 +46,7 @@ export default function PredictionsPage() {
     matches, groupMatches, predictionsByMatchForMe,
     advancementPredictions, finalsPredictions, awardPredictions, pollPredictions,
     extraPredictions, teamBoosts,
-    me, config, confirmAdvancement, saveFinalists, saveAwards, savePollPrediction, saveExtras
+    me, config, saveFinalists, saveAwards, savePollPrediction, saveExtras
   } = useData();
   const { show } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -139,12 +138,6 @@ export default function PredictionsPage() {
           teamsByCode={teamsByCode}
           teamsByGroup={teamsByGroup}
           predictions={predictionsByMatchForMe}
-          confirmed={me ? advancementPredictions[me.id] : null}
-          teamBoosts={teamBoosts}
-          onConfirm={(arr) => {
-            confirmAdvancement(arr);
-            show('Palpite de classificação confirmado', { variant: 'success' });
-          }}
         />
       )}
 
@@ -192,24 +185,14 @@ function PendingChecklist({
   const statuses = useMemo(() => {
     if (!me) return null;
 
-    // Advancement: incomplete (missing match picks) → stale (changed since
-    // last confirm) → missing (never confirmed) → ok.
-    const confirmedAdv = advancementPredictions[me.id];
+    // Advancement is auto-saved on every group placar save, so the only
+    // meaningful state for the checklist is: do we have all 72 group
+    // predictions in? If yes → "ok", otherwise → "incomplete".
     const predictedMatches = predictedMatchesFromPlayer({
       groupMatches, predictionsByMatchId: predictionsByMatchForMe
     });
     const standings = computeStandings({ matches: predictedMatches, teamsByGroup });
-    let advStatus;
-    if (standings.missingMatches > 0) {
-      advStatus = confirmedAdv ? 'stale' : 'incomplete';
-    } else if (!confirmedAdv) {
-      advStatus = 'missing';
-    } else {
-      const adv = Array.from(standings.advancing);
-      const ok = confirmedAdv.teams.length === adv.length &&
-                 confirmedAdv.teams.every(t => standings.advancing.has(t));
-      advStatus = ok ? 'ok' : 'stale';
-    }
+    const advStatus = standings.missingMatches === 0 ? 'ok' : 'incomplete';
 
     const extras = extraPredictions[me.id];
     const awards = awardPredictions[me.id];
@@ -292,9 +275,7 @@ function PendingChecklist({
 /* Advancement                                                            */
 /* ====================================================================== */
 
-function AdvancementTab({ groupMatches, allMatches, teamsByCode, teamsByGroup, predictions, confirmed, teamBoosts = {}, onConfirm }) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
-
+function AdvancementTab({ groupMatches, allMatches, teamsByCode, teamsByGroup, predictions }) {
   // Build the "as-if predicted" set of matches.
   const predictedMatches = useMemo(
     () => predictedMatchesFromPlayer({ groupMatches, predictionsByMatchId: predictions }),
@@ -311,9 +292,6 @@ function AdvancementTab({ groupMatches, allMatches, teamsByCode, teamsByGroup, p
 
   const allPredicted = standings.missingMatches === 0;
   const advancingArr = Array.from(standings.advancing);
-  const isConfirmed = !!confirmed && confirmed.teams &&
-    confirmed.teams.length === advancingArr.length &&
-    confirmed.teams.every(t => standings.advancing.has(t));
 
   const bestThirdMarker = (groupKey) => {
     const row = standings.groups[groupKey]?.[2];
@@ -329,14 +307,13 @@ function AdvancementTab({ groupMatches, allMatches, teamsByCode, teamsByGroup, p
         <h3 className="pred-section-title">Suas tabelas previstas</h3>
         <p className="muted">
           Essas tabelas são derivadas dos seus palpites em <strong>Jogos</strong>.
-          Atualize um placar lá e elas recalculam aqui.
+          Atualize um placar lá e a classificação que você vê aqui se salva sozinha — não tem mais botão de confirmar.
         </p>
 
         {!allPredicted && (
           <p className="pred-advancement__warn">
             <Pill variant="warning">Incompleto</Pill> {standings.missingMatches}{' '}
             {standings.missingMatches === 1 ? 'jogo de grupo ainda precisa' : 'jogos de grupo ainda precisam'} de palpite.
-            Você pode confirmar a classificação quando todos estiverem prontos.
           </p>
         )}
 
@@ -356,7 +333,7 @@ function AdvancementTab({ groupMatches, allMatches, teamsByCode, teamsByGroup, p
       <Card id="sec-advancement">
         <h3 className="pred-section-title">Seleções que você acha que vão se classificar ({advancingArr.length})</h3>
         <p className="muted">
-          Cada acerto vale <strong>5 pts</strong>. Pontuação flat — sem multiplicador.
+          Cada acerto vale <strong>5 pts</strong>. Pontuação flat — sem multiplicador. Atualiza automaticamente quando você muda placares em <strong>Jogos</strong>.
         </p>
         <div className="pred-advancement__grid">
           {advancingArr.map((code) => (
@@ -364,23 +341,6 @@ function AdvancementTab({ groupMatches, allMatches, teamsByCode, teamsByGroup, p
               <TeamChip team={teamsByCode[code]} selected showCode layout="stacked" />
             </div>
           ))}
-        </div>
-
-        <div className="pred-confirm__row">
-          {isConfirmed ? (
-            <Pill variant="success">Confirmado — {confirmed.teams.length} seleções travadas</Pill>
-          ) : confirmed ? (
-            <Pill variant="warning">Confirmação desatualizada — confirme de novo</Pill>
-          ) : (
-            <Pill variant="neutral">Ainda não confirmado</Pill>
-          )}
-          <Button
-            variant="primary"
-            onClick={() => setConfirmOpen(true)}
-            disabled={!allPredicted}
-          >
-            Confirmar meu palpite de classificação
-          </Button>
         </div>
       </Card>
 
@@ -391,33 +351,6 @@ function AdvancementTab({ groupMatches, allMatches, teamsByCode, teamsByGroup, p
           allMatches={allMatches}
         />
       </Card>
-
-      <Modal
-        open={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
-        title="Confirmar classificação"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                onConfirm(advancingArr);
-                setConfirmOpen(false);
-              }}
-            >
-              Travar
-            </Button>
-          </>
-        }
-      >
-        <p>Você está confirmando que essas {advancingArr.length} seleções vão passar da fase de grupos. Você pode reconfirmar quantas vezes quiser até o mundial começar.</p>
-        <div className="pred-advancement__grid pred-advancement__grid--compact">
-          {advancingArr.map((code) => (
-            <TeamChip key={code} team={teamsByCode[code]} showCode />
-          ))}
-        </div>
-      </Modal>
     </div>
   );
 }
@@ -657,18 +590,18 @@ function NumericasSection({ current, onSave }) {
     <Card id="sec-numericas">
       <h3 className="pred-section-title">Apostas numéricas</h3>
       <p className="muted">
-        Exato = pontuação máxima, <strong>−5 pts por gol de diferença</strong>, mínimo 0.
+        Só o <strong>total de gols</strong> usa proximidade (−5 pts por gol errado, mínimo 0). G+A do Neymar e gols do artilheiro são tudo-ou-nada: cravou ganha tudo, errou ganha 0.
       </p>
       <label className="pred-field">
-        <span>Total de gols na Copa (60 pts)</span>
+        <span>Total de gols na Copa (60 pts — proximidade)</span>
         <input type="text" inputMode="numeric" value={vals.totalGoalsWC} onChange={updateNum('totalGoalsWC')} placeholder="ex: 172" />
       </label>
       <label className="pred-field">
-        <span>Gols + assistências do Neymar (30 pts)</span>
+        <span>Gols + assistências do Neymar (30 pts — cravada)</span>
         <input type="text" inputMode="numeric" value={vals.neymarGA} onChange={updateNum('neymarGA')} placeholder="ex: 5" />
       </label>
       <label className="pred-field">
-        <span>Nº de gols do artilheiro da copa (20 pts)</span>
+        <span>Nº de gols do artilheiro da copa (20 pts — cravada)</span>
         <input type="text" inputMode="numeric" value={vals.topScorerGoals} onChange={updateNum('topScorerGoals')} placeholder="ex: 8" />
       </label>
       <div className="pred-confirm__row">

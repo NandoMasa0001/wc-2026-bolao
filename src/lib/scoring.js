@@ -30,7 +30,11 @@ function sign(n) {
 
 /**
  * Base points for a single match prediction vs the actual result.
- * Returns an integer in {0, 1, 2, 3, 7}.
+ * Returns 8 for an exact score (cravada), 5 for the right outcome
+ * (acerto — win/draw/loss matches, regardless of how close the score
+ * was), 0 for everything else. Matching just one team's score with the
+ * wrong outcome scores nothing — only outcome accuracy or full exact
+ * counts.
  */
 export function baseMatchPoints(prediction, actual) {
   if (!prediction || !actual) return 0;
@@ -44,10 +48,9 @@ export function baseMatchPoints(prediction, actual) {
   ) {
     return 0;
   }
-  const teamsMatched = (ph === ah ? 1 : 0) + (pa === aa ? 1 : 0);
-  if (teamsMatched === 2) return 7;
+  if (ph === ah && pa === aa) return 8;
   const outcomeOK = sign(ph - pa) === sign(ah - aa);
-  return (outcomeOK ? 2 : 0) + (teamsMatched === 1 ? 1 : 0);
+  return outcomeOK ? 5 : 0;
 }
 
 /**
@@ -98,10 +101,10 @@ export function pickedOutcomeProb(prediction, odds) {
  *
  * Knockout advancer rule (only when stage !== 'group'):
  *   - If the player predicted a TIE AND included `prediction.advancer`:
- *       • Actual ended non-tie + advancer correct → base += 2
- *         (upgrades a 0 to 2 — "resultado correto", or 1 to 3 — "+1 placar")
+ *       • Actual ended non-tie + advancer correct → base += 5
+ *         (upgrades 0 to 5 — "acertou o resultado via penalty pick")
  *       • Actual ended tie (cravou) + advancer wrong → base -= 1
- *         (penalty: cravou would be 7 → 6)
+ *         (penalty: cravada would be 8 → 7)
  *   "actual winner" comes from `actual.winner` (set by the cron once the
  *   real result lands) or from the score sign as a fallback.
  *
@@ -140,13 +143,13 @@ export function matchPoints(
 
       const advancerCorrect = actualWinner && prediction.advancer === actualWinner;
 
-      if (predictedTie && actualTie && base === 7) {
-        // Cravou empate: keep 7 if advancer correct, drop to 6 if wrong.
+      if (predictedTie && actualTie && base === 8) {
+        // Cravou empate: keep 8 if advancer correct, drop to 7 if wrong.
         if (actualWinner && !advancerCorrect) base -= 1;
       } else if (predictedTie && !actualTie) {
-        // Predicted tie, actual non-tie: credit "correct outcome" via the
-        // advancer (+2 base on top of whatever team-match credit there was).
-        if (advancerCorrect) base += 2;
+        // Predicted tie, actual non-tie: credit "acertou o resultado" via
+        // the advancer pick (+5 base — same as a normal outcome hit).
+        if (advancerCorrect) base += 5;
       }
     }
   }
@@ -266,6 +269,12 @@ export function scoreCloseness(predicted, actual, max, perUnitOff = 5) {
   return Math.max(0, max - perUnitOff * diff);
 }
 
+/** Exact-match numeric scoring: predicted === actual → max, else 0. */
+export function scoreExactNumber(predicted, actual, max) {
+  if (predicted == null || actual == null) return 0;
+  return Number(predicted) === Number(actual) ? max : 0;
+}
+
 /** Exact-match text scoring (case-insensitive, whitespace-trimmed). */
 export function scoreExactText(predicted, actual, points) {
   if (!predicted || !actual) return 0;
@@ -295,14 +304,16 @@ export function scoreExtras(predicted = {}, actual = {}, teamBoosts = {}) {
     total += Math.ceil(30 * boost);
   }
 
-  // 2. Total goals in WC (60 max, −5 per goal off)
+  // 2. Total goals in WC (60 max, −5 per goal off) — closeness scoring,
+  // because the realistic answer space is large and a 1-goal miss
+  // shouldn't go to zero.
   total += scoreCloseness(predicted.totalGoalsWC, actual.totalGoalsWC, 60);
 
-  // 3. Neymar G+A (30 max, −5 per off)
-  total += scoreCloseness(predicted.neymarGA, actual.neymarGA, 30);
+  // 3. Neymar G+A (30 pts, EXACT only)
+  total += scoreExactNumber(predicted.neymarGA, actual.neymarGA, 30);
 
-  // 4. Top scorer goal count (20 max, −5 per off)
-  total += scoreCloseness(predicted.topScorerGoals, actual.topScorerGoals, 20);
+  // 4. Top scorer goal count (20 pts, EXACT only)
+  total += scoreExactNumber(predicted.topScorerGoals, actual.topScorerGoals, 20);
 
   // 5. First goal scorer for Brazil (30 pts)
   total += scoreExactText(predicted.firstGoalBrazil, actual.firstGoalBrazil, 30);

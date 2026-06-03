@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext.jsx';
 import { supabase, useMock } from '../supabase.js';
+import { computeStandings, predictedMatchesFromPlayer } from '../lib/standings.js';
 import {
   mockConfig,
   mockTeams,
@@ -676,8 +677,32 @@ function SupabaseDataProvider({ children }) {
     const { error } = await supabase
       .from('predictions')
       .upsert(payload, { onConflict: 'player_id,match_id' });
-    if (error) console.error('savePrediction', error);
-  }, [session, matches, paused]);
+    if (error) { console.error('savePrediction', error); return; }
+
+    // Auto-classificação: changing a group placar shifts the standings,
+    // so re-derive the 32 advancing teams and upsert advancement_predictions
+    // automatically. No more "Confirmar" button on /palpites.
+    if (match.stage === 'group') {
+      const updatedForMe = {
+        ...predictionsByMatchForMe,
+        [matchId]: { matchId, stage: 'group', homeScore, awayScore }
+      };
+      const predicted = predictedMatchesFromPlayer({
+        groupMatches, predictionsByMatchId: updatedForMe
+      });
+      const standings = computeStandings({ matches: predicted, teamsByGroup });
+      const advancingTeams = Array.from(standings.advancing);
+      const { error: advErr } = await supabase
+        .from('advancement_predictions')
+        .upsert({
+          player_id:    session.id,
+          teams:        advancingTeams,
+          confirmed_at: new Date().toISOString(),
+          points:       0
+        }, { onConflict: 'player_id' });
+      if (advErr) console.error('auto-advancement upsert', advErr);
+    }
+  }, [session, matches, paused, predictionsByMatchForMe, groupMatches, teamsByGroup]);
 
   const saveMatchResult = useCallback(async (matchId, { homeScore, awayScore, status }) => {
     if (!me?.isAdmin) return;

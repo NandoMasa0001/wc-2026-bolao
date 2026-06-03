@@ -69,8 +69,8 @@ export default function ConsensoPage() {
 
         if (m.status === 'finished' && m.homeScore != null && m.awayScore != null) {
           const base = baseMatchPoints(pr, m);
-          if (base === 7) exactScores.push({ player: playersById[pr.playerId], score: key });
-          else if (base >= 2) outcomeHits.push({ player: playersById[pr.playerId], score: key });
+          if (base === 8) exactScores.push({ player: playersById[pr.playerId], score: key });
+          else if (base === 5) outcomeHits.push({ player: playersById[pr.playerId], score: key });
         }
       }
 

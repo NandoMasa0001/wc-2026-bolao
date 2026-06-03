@@ -220,12 +220,16 @@ pick teams from a flat list.
    and shows, for each of the 12 groups, the **predicted final table**
    (`GroupTable`) — who finishes 1st–4th.
 3. It also computes the **8 best third-placed teams** across all groups.
-4. The player sees the resulting **32 teams** highlighted and taps
-   **"Confirm my advancement prediction"** → writes `advancementPredictions`.
-5. They may re-edit group scores and re-confirm any time until
-   `tournamentStartsAt`. The last confirmed snapshot is what scores.
-6. An advancement prediction can only be confirmed when **all 72 group matches
-   are predicted** (otherwise standings are incomplete — show which are missing).
+4. The resulting **32 teams** are auto-saved as the player's
+   `advancementPredictions` — **no manual confirm**. Whenever a group
+   placar changes in `/matches`, the standings re-derive and the
+   `advancement_predictions` row is upserted from inside `savePrediction`.
+5. They may keep editing group scores any time until `tournamentStartsAt`;
+   the always-fresh derived list is what scores.
+6. Partial state is fine: with fewer than 72 group picks the standings
+   are best-effort and the advancement row holds whatever the partial
+   computation yields. The pending checklist on `/predictions` shows
+   "incompleto" until all 72 are predicted.
 
 ### 6.2 `standings.js` — required logic
 For each group, from the player's predicted scores compute: Played, Won, Drawn,
@@ -251,16 +255,18 @@ cron script (`fetch-results.mjs`) after results change, and may also be
 triggered from `/admin`. The web app imports the same functions to **preview**
 potential points but never writes official points itself.
 
-### 7.1 Per-match base points (stacking tiers)
+### 7.1 Per-match base points
 Given a prediction `(ph, pa)` and an actual result `(ah, aa)`:
 ```
-teamsMatched = (ph === ah ? 1 : 0) + (pa === aa ? 1 : 0)
-if (teamsMatched === 2)            base = 5      // exact score
-else:
-  outcomeOK = sign(ph - pa) === sign(ah - aa)    // same win/draw/loss
-  base = (outcomeOK ? 2 : 0) + (teamsMatched === 1 ? 1 : 0)
+if (ph === ah && pa === aa)                base = 8   // cravada
+else if (sign(ph-pa) === sign(ah-aa))      base = 5   // acerto do resultado
+else                                       base = 0
 ```
-So base ∈ {0, 1, 2, 3, 5}. A skipped match (no prediction) scores 0.
+So base ∈ {0, 5, 8}. Matching only one team's score with the wrong
+outcome scores nothing — the only paths to points are full exact (cravada)
+or correct outcome (acerto). Knockout advancer rule on a tie prediction
+can shift this to 7 (cravada with wrong advancer) or 5 (predicted tie
++ correct advancer when actual was non-tie). A skipped match scores 0.
 
 ### 7.2 Round multiplier
 Later rounds are worth more. The base points are multiplied by the round
@@ -282,14 +288,14 @@ Multipliers compound at ×1.25 per round from the group stage:
 
 Resulting point values (`ceil(base × multiplier)`):
 
-| Stage | Exact (5) | Outcome+1 team (3) | Outcome (2) | 1 team (1) |
-|---|---|---|---|---|
-| Group | 5 | 3 | 2 | 1 |
-| R32 | 7 | 4 | 3 | 2 |
-| R16 | 8 | 5 | 4 | 2 |
-| QF / 3rd | 10 | 6 | 4 | 2 |
-| SF | 13 | 8 | 5 | 3 |
-| Final | 16 | 10 | 7 | 4 |
+| Stage | Cravada (8) | Acerto (5) |
+|---|---|---|
+| Group | 8 | 5 |
+| R32 | 10 | 7 |
+| R16 | 13 | 8 |
+| QF / 3rd | 16 | 10 |
+| SF | 20 | 13 |
+| Final | 25 | 16 |
 
 Multipliers are read from `config.tournament.roundMultipliers` so they can be
 tuned without a code change.

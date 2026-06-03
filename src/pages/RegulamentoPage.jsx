@@ -44,7 +44,7 @@ export default function RegulamentoPage() {
       <Card className="reg-card">
         <h3 className="reg-h">1. Pontos por partida</h3>
         <p className="muted">
-          A cada jogo, dependendo do quão certo está o seu palpite, você ganha de 0 a 7 pontos <em>base</em>:
+          Sistema enxuto: cravou o placar exato vale 8, acertar só o resultado (vencedor ou empate) vale 5, qualquer outra coisa vale 0. Acertar o número de gols de só um dos times sem acertar o resultado <strong>não pontua</strong>.
         </p>
         <div className="reg-table-wrap">
           <table className="reg-table">
@@ -55,11 +55,9 @@ export default function RegulamentoPage() {
               </tr>
             </thead>
             <tbody>
-              <tr><td>Cravou o placar (ex: 2–1 vs 2–1)</td><td className="ta-c"><strong>7</strong></td></tr>
-              <tr><td>Acertou o vencedor <strong>e</strong> o nº de gols de um dos times</td><td className="ta-c"><strong>3</strong></td></tr>
-              <tr><td>Só acertou o vencedor (ou que ia ser empate)</td><td className="ta-c"><strong>2</strong></td></tr>
-              <tr><td>Errou o vencedor, mas acertou o nº de gols de um dos times</td><td className="ta-c"><strong>1</strong></td></tr>
-              <tr><td>Não acertou nada</td><td className="ta-c">0</td></tr>
+              <tr><td><strong>Cravada</strong> (placar exato, ex: 2–1 vs 2–1)</td><td className="ta-c"><strong>8</strong></td></tr>
+              <tr><td><strong>Acerto</strong> (vencedor correto, ou empate quando deu empate)</td><td className="ta-c"><strong>5</strong></td></tr>
+              <tr><td>Qualquer outra coisa (errou o resultado)</td><td className="ta-c">0</td></tr>
               <tr><td className="muted">Sem palpite</td><td className="ta-c muted">0</td></tr>
             </tbody>
           </table>
@@ -70,10 +68,10 @@ export default function RegulamentoPage() {
             Empate não existe em jogo eliminatório — alguém sempre passa (prorrogação / pênaltis). Por isso, sempre que você palpitar um placar de empate num jogo de mata-mata, é obrigatório escolher também a seleção que avança. O sistema usa essa escolha pra recompensar/penalizar:
           </p>
           <ul className="reg-ul">
-            <li><strong>Cravou o empate + acertou quem passa</strong>: 7 pts cheios.</li>
-            <li><strong>Cravou o empate + errou quem passa</strong>: 6 pts (perde 1).</li>
-            <li><strong>Palpitou empate, real foi não-empate + acertou quem passa</strong>: vira "acertou o resultado" (+2 base).</li>
-            <li><strong>Palpitou empate, real foi não-empate + errou quem passa</strong>: 0 (ou 1, se acertou o nº de gols de um dos times).</li>
+            <li><strong>Cravou o empate + acertou quem passa</strong>: 8 pts cheios.</li>
+            <li><strong>Cravou o empate + errou quem passa</strong>: 7 pts (perde 1).</li>
+            <li><strong>Palpitou empate, real foi não-empate + acertou quem passa</strong>: vira "acertou o resultado" (5 pts).</li>
+            <li><strong>Palpitou empate, real foi não-empate + errou quem passa</strong>: 0.</li>
           </ul>
           <p className="muted reg-foot">
             Jogos de mata-mata só ficam palpitáveis depois que os times anteriores forem definidos (R32 abre quando grupos terminarem; R16 abre quando R32 terminar; etc.). Cada jogo trava no seu próprio apito inicial.
@@ -93,19 +91,17 @@ export default function RegulamentoPage() {
               <tr>
                 <th>Fase</th>
                 <th className="ta-c">Multiplicador</th>
-                <th className="ta-c">Cravou</th>
-                <th className="ta-c">+1 placar</th>
-                <th className="ta-c">Resultado</th>
-                <th className="ta-c">1 placar</th>
+                <th className="ta-c">Cravada</th>
+                <th className="ta-c">Acerto</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td>Grupos</td><td className="ta-c">×1.00</td><td className="ta-c">7</td><td className="ta-c">3</td><td className="ta-c">2</td><td className="ta-c">1</td></tr>
-              <tr><td>32-avos</td><td className="ta-c">×1.25</td><td className="ta-c">9</td><td className="ta-c">4</td><td className="ta-c">3</td><td className="ta-c">2</td></tr>
-              <tr><td>Oitavas</td><td className="ta-c">×1.5625</td><td className="ta-c">11</td><td className="ta-c">5</td><td className="ta-c">4</td><td className="ta-c">2</td></tr>
-              <tr><td>Quartas / 3º</td><td className="ta-c">×1.9531</td><td className="ta-c">14</td><td className="ta-c">6</td><td className="ta-c">4</td><td className="ta-c">2</td></tr>
-              <tr><td>Semi</td><td className="ta-c">×2.4414</td><td className="ta-c">18</td><td className="ta-c">8</td><td className="ta-c">5</td><td className="ta-c">3</td></tr>
-              <tr><td>Final</td><td className="ta-c">×3.0518</td><td className="ta-c">22</td><td className="ta-c">10</td><td className="ta-c">7</td><td className="ta-c">4</td></tr>
+              <tr><td>Grupos</td><td className="ta-c">×1.00</td><td className="ta-c">8</td><td className="ta-c">5</td></tr>
+              <tr><td>32-avos</td><td className="ta-c">×1.25</td><td className="ta-c">10</td><td className="ta-c">7</td></tr>
+              <tr><td>Oitavas</td><td className="ta-c">×1.5625</td><td className="ta-c">13</td><td className="ta-c">8</td></tr>
+              <tr><td>Quartas / 3º</td><td className="ta-c">×1.9531</td><td className="ta-c">16</td><td className="ta-c">10</td></tr>
+              <tr><td>Semi</td><td className="ta-c">×2.4414</td><td className="ta-c">20</td><td className="ta-c">13</td></tr>
+              <tr><td>Final</td><td className="ta-c">×3.0518</td><td className="ta-c">25</td><td className="ta-c">16</td></tr>
             </tbody>
           </table>
         </div>
@@ -121,7 +117,7 @@ export default function RegulamentoPage() {
           <h4 className="reg-h4">3.1. Classificação <span className="muted">— 5 pts por seleção que realmente passar (sem multiplicador)</span></h4>
           <p>
             Você palpita o placar dos 72 jogos da fase de grupos; o sistema deriva automaticamente quem classifica (16 primeiros lugares + 16 segundos + 8 melhores terceiros = 32 seleções).
-            Quando todos os palpites estiverem completos, você confirma a lista. Cada acerto vale <strong>5 pontos flat</strong> — sem boost por seleção (volume de 32 picks já dá peso suficiente).
+            Não tem botão de "confirmar" — a sua lista de 32 atualiza sozinha toda vez que você muda um placar em Jogos. Cada acerto vale <strong>5 pontos flat</strong> — sem boost por seleção (volume de 32 picks já dá peso suficiente).
             <br />
             <strong>Máximo possível:</strong> 160 pts (acertando os 32).
           </p>
@@ -219,8 +215,8 @@ export default function RegulamentoPage() {
             <tbody>
               <tr><td>O campeão</td><td>Seleção</td><td className="ta-c">30 × multiplicador</td></tr>
               <tr><td>Total de gols na copa</td><td>Número</td><td className="ta-c">60 exato, −5 por gol off</td></tr>
-              <tr><td>G+A do Neymar</td><td>Número</td><td className="ta-c">30 exato, −5 por gol off</td></tr>
-              <tr><td>Nº de gols do artilheiro</td><td>Número</td><td className="ta-c">20 exato, −5 por gol off</td></tr>
+              <tr><td>G+A do Neymar</td><td>Número</td><td className="ta-c">30 (cravada) ou 0</td></tr>
+              <tr><td>Nº de gols do artilheiro</td><td>Número</td><td className="ta-c">20 (cravada) ou 0</td></tr>
               <tr><td>Primeiro gol do Brasil</td><td>Jogador (texto)</td><td className="ta-c">30</td></tr>
               <tr><td>Último gol do Brasil</td><td>Jogador (texto)</td><td className="ta-c">20</td></tr>
               <tr><td>100º gol da copa</td><td>Jogador (texto)</td><td className="ta-c">50</td></tr>
@@ -228,7 +224,7 @@ export default function RegulamentoPage() {
           </table>
         </div>
         <p className="muted reg-foot">
-          Apostas numéricas: pontos = <code>max(0, máximo − 5 × |seu palpite − valor real|)</code>. Errar por mais que o teto zera. Apostas de texto exigem o nome exato (não diferencia maiúscula/minúscula).
+          Só o <strong>total de gols</strong> tem a regra de proximidade (<code>max(0, 60 − 5 × |seu palpite − valor real|)</code>); errar por mais que 12 zera. As outras numéricas (G+A do Neymar, gols do artilheiro) são tudo-ou-nada: cravou o número ganha tudo, errou por qualquer margem ganha zero. Apostas de texto exigem o nome exato (não diferencia maiúscula/minúscula).
         </p>
       </Card>
 
