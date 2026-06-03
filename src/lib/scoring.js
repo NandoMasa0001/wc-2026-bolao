@@ -168,12 +168,20 @@ export function matchPoints(
 }
 
 /**
- * Compute a per-team boost map from championship outright odds via
- * RANK-BASED scaling.
+ * Compute a per-team boost map from championship outright odds.
  *
  * `championOdds` is { teamCode: impliedProbabilityToWinChampionship }.
- * The favorite (highest prob) earns 1×; the longest shot (lowest prob)
- * earns up to `cap`. Linear in rank.
+ *
+ * Uses a LOG-PROBABILITY interpolation: each team's boost is determined
+ * by where its log(prob) sits between the favorite's log(prob) and the
+ * longest shot's log(prob). This gives a noticeable gradient even among
+ * top favorites — a 20% team and a 12% team land at clearly different
+ * boost values, instead of the flat near-1× bunch you'd get from a
+ * rank-based scheme.
+ *
+ *   favorite (highest prob)    → 1×
+ *   longest shot (lowest prob) → cap (default 2.5×)
+ *   middle teams               → spaced by log-prob ratio
  *
  * Returns { teamCode: boostMultiplier }.
  */
@@ -182,12 +190,21 @@ export function rankBoostsFromChampionOdds(championOdds = {}, cap = BOOST_CAP) {
     ([, p]) => typeof p === 'number' && p > 0
   );
   if (entries.length < 2) return {};
-  entries.sort((a, b) => b[1] - a[1]); // favorite first
-  const N = entries.length;
+
+  const probs = entries.map(([, p]) => p);
+  const maxP  = Math.max(...probs);
+  const minP  = Math.max(Math.min(...probs), 1e-5);
+  const logMax = Math.log(maxP);
+  const logMin = Math.log(minP);
+  const span   = logMin - logMax; // negative number (logMin < logMax)
+
   const out = {};
-  for (let i = 0; i < N; i++) {
-    const synthProb = 1 - i / (N - 1); // rank 0 → 1.0, last → 0.0
-    out[entries[i][0]] = boostFromProb(synthProb, BOOST_K, cap);
+  for (const [code, p] of entries) {
+    const safeP = Math.max(p, 1e-5);
+    // t ∈ [0, 1]: 0 = favorite, 1 = longest shot
+    const t = span === 0 ? 0 : (Math.log(safeP) - logMax) / span;
+    const clamped = Math.max(0, Math.min(1, t));
+    out[code] = 1 + clamped * (cap - 1);
   }
   return out;
 }

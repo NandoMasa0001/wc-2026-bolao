@@ -156,7 +156,7 @@ export default function RegulamentoPage() {
       <Card className="reg-card">
         <h3 className="reg-h">4. Multiplicador de zebra (palpites longos)</h3>
         <p>
-          As casas de apostas listam cada seleção pela <em>probabilidade de ser campeã</em>. A gente pega esse ranking e usa pra premiar quem aposta em zebra. <strong>Favorito = 1×, último colocado = 2.5×</strong>, linear no meio.
+          As casas de apostas listam cada seleção pela <em>probabilidade de ser campeã</em>. A gente usa a probabilidade real (não o ranking) pra calcular o multiplicador, com escala logarítmica — assim os favoritos do topo já têm diferenças visíveis entre si (ex: França e Brasil saem com multiplicadores claramente distintos, em vez de quase iguais). <strong>Favorito = 1×, azarão extremo = 2.5×</strong>, log-prob no meio.
         </p>
 
         <details className="reg-details">
