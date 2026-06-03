@@ -12,3 +12,5 @@ supabase/.branches/
 # Local screenshots / reference images
 Screenshot*.png
 *.heic
+# Local scratchpad spreadsheets (the owner's worksheet, not project data)
+*.xlsx
