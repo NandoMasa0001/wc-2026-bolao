@@ -19,6 +19,7 @@ function BreakdownRow({ label, value, strong = false }) {
 
 const STAGE_LABEL = {
   group: 'Grupo',
+  friendly: 'Amistoso (teste)',
   r32: 'Oitavas (R32)',
   r16: '16-avos',
   qf: 'Quartas',
@@ -161,7 +162,11 @@ export default function MatchCard({
     : (tournamentStarted || match.status !== 'scheduled');
   const hasPrediction = !!prediction;
 
-  const countdown = useCountdown(match.kickoffAt);
+  // For group matches the lock is global (apito inicial do mundial), not
+  // each match's kickoff — count down to that. Knockout matches keep
+  // their per-match countdown.
+  const lockAt = isKnockout ? match.kickoffAt : (tournamentStartsAt || match.kickoffAt);
+  const countdown = useCountdown(lockAt);
 
   // Compute points if finished.
   let earnedBase = 0;

@@ -95,9 +95,11 @@ export default function MatchesPage() {
   const visible = useMemo(() => {
     const primary   = FILTERS.find(f => f.key === filter)?.match     || (() => true);
     const secondary = PRED_FILTERS.find(f => f.key === predFilter)?.match || (() => true);
-    const arr = matches.filter(m =>
-      primary(m) && secondary(m, predictionsByMatchForMe)
-    );
+    const arr = matches.filter(m => {
+      // Amistosos de teste só aparecem pro admin — não vão pra Jogos da galera.
+      if (m.stage === 'friendly' && !me?.isAdmin) return false;
+      return primary(m) && secondary(m, predictionsByMatchForMe);
+    });
     const rank = (m) => m.status === 'live' ? 0 : m.status === 'scheduled' ? 1 : 2;
     return [...arr].sort((a, b) => {
       const ra = rank(a), rb = rank(b);
@@ -106,7 +108,7 @@ export default function MatchesPage() {
       const tb = new Date(b.kickoffAt).getTime();
       return a.status === 'finished' ? tb - ta : ta - tb;
     });
-  }, [matches, filter, predFilter, predictionsByMatchForMe]);
+  }, [matches, filter, predFilter, predictionsByMatchForMe, me]);
 
   const groups = useMemo(() => {
     const map = new Map();
