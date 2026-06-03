@@ -124,8 +124,12 @@ export default function RegulamentoPage() {
         </div>
 
         <div className="reg-section">
-          <h4 className="reg-h4">3.2. Finalistas <span className="muted">— 20 pts × multiplicador, por finalista correto</span></h4>
-          <p>Você escolhe duas seleções; ordem não importa. Máximo: ~100 pts (se ambas forem zebras).</p>
+          <h4 className="reg-h4">3.2. Finalistas <span className="muted">— 20 pts × multiplicador (suave), por finalista correto</span></h4>
+          <p>
+            Você escolhe duas seleções; ordem não importa. O multiplicador de zebra é <strong>mais suave</strong> que o do campeão (chegar à final é cerca de 2× mais provável que ganhar a copa, então a diferença entre favorito e azarão é menor). Favorito = <strong>1×</strong>, azarão extremo = <strong>1.75×</strong>.
+            <br />
+            <strong>Máximo:</strong> ~70 pts (ambos zebras), com favoritos = 40 pts.
+          </p>
         </div>
 
         <div className="reg-section">

@@ -8,6 +8,7 @@ import Pill from '../components/Pill.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { computeStandings, predictedMatchesFromPlayer } from '../lib/standings.js';
+import { finalistBoost } from '../lib/scoring.js';
 import { buildFullBracket, buildBracketColumns } from '../lib/predictedBracket.js';
 import './PredictionsPage.css';
 
@@ -647,8 +648,11 @@ function QuemMarcaSection({ current, onSave }) {
   );
 }
 
+const FINALISTS_TOP_N = 12;
+
 function FinalistsTab({ teams, current, teamBoosts = {}, onSave }) {
   const [picks, setPicks] = useState(current?.finalists || []);
+  const [showAll, setShowAll] = useState(false);
 
   const toggle = (code) => {
     setPicks((arr) => {
@@ -671,15 +675,28 @@ function FinalistsTab({ teams, current, teamBoosts = {}, onSave }) {
     });
   }, [teams, teamBoosts]);
 
+  // Default view: top N favorites + whatever the user has already picked
+  // (so a zebra selection doesn't disappear when the list collapses).
+  // Expanded view: show all 48.
+  const visibleTeams = useMemo(() => {
+    if (showAll) return sortedTeams;
+    const top = sortedTeams.slice(0, FINALISTS_TOP_N);
+    const topCodes = new Set(top.map(t => t.code));
+    const extraPicks = sortedTeams.filter(t => picks.includes(t.code) && !topCodes.has(t.code));
+    return [...top, ...extraPicks];
+  }, [sortedTeams, showAll, picks]);
+
+  const hiddenCount = sortedTeams.length - visibleTeams.length;
+
   return (
     <Card id="sec-finalistas">
       <h3 className="pred-section-title">Escolha os dois finalistas</h3>
       <p className="muted">
-        20 pontos × multiplicador por finalista correto. Em ordem de favoritismo (do favorito ao azarão).
+        20 pontos × multiplicador por finalista correto. O multiplicador de zebra é mais suave do que o do campeão (porque chegar à final é bem mais fácil que ganhar a copa) — favorito = 1×, azarão extremo = 1.75×.
       </p>
       <div className="pred-finalists__grid">
-        {sortedTeams.map(team => {
-          const boost = teamBoosts[team.code] || 1;
+        {visibleTeams.map(team => {
+          const boost = finalistBoost(teamBoosts[team.code] || 1);
           return (
             <button
               type="button"
@@ -696,6 +713,20 @@ function FinalistsTab({ teams, current, teamBoosts = {}, onSave }) {
           );
         })}
       </div>
+      {hiddenCount > 0 && (
+        <div style={{ marginTop: 'var(--sp-3)', textAlign: 'center' }}>
+          <Button variant="ghost" onClick={() => setShowAll(true)}>
+            Mostrar mais {hiddenCount} seleções ↓
+          </Button>
+        </div>
+      )}
+      {showAll && (
+        <div style={{ marginTop: 'var(--sp-3)', textAlign: 'center' }}>
+          <Button variant="ghost" onClick={() => setShowAll(false)}>
+            Mostrar só os favoritos ↑
+          </Button>
+        </div>
+      )}
       <div className="pred-confirm__row">
         <Pill variant="neutral">{picks.length}/2 selecionados</Pill>
         <Button
