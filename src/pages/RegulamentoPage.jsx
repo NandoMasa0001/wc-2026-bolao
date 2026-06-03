@@ -222,8 +222,8 @@ export default function RegulamentoPage() {
               <tr><td>Total de gols na copa</td><td>Número</td><td className="ta-c">60 exato, −5 por gol off</td></tr>
               <tr><td>G+A do Neymar</td><td>Número</td><td className="ta-c">30 (cravada) ou 0</td></tr>
               <tr><td>Nº de gols do artilheiro</td><td>Número</td><td className="ta-c">20 (cravada) ou 0</td></tr>
-              <tr><td>Primeiro gol do Brasil</td><td>Jogador (texto)</td><td className="ta-c">30</td></tr>
-              <tr><td>Último gol do Brasil</td><td>Jogador (texto)</td><td className="ta-c">20</td></tr>
+              <tr><td>Primeiro gol do Brasil</td><td>Jogador (texto)</td><td className="ta-c">25</td></tr>
+              <tr><td>Último gol do Brasil</td><td>Jogador (texto)</td><td className="ta-c">25</td></tr>
               <tr><td>100º gol da copa</td><td>Jogador (texto)</td><td className="ta-c">50</td></tr>
             </tbody>
           </table>

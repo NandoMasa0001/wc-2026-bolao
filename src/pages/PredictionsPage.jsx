@@ -629,11 +629,11 @@ function QuemMarcaSection({ current, onSave }) {
       <h3 className="pred-section-title">Quem marca o gol</h3>
       <p className="muted">Texto livre — tem que bater exato com o nome do jogador.</p>
       <label className="pred-field">
-        <span>Primeiro gol do Brasil na copa (30 pts)</span>
+        <span>Primeiro gol do Brasil na copa (25 pts)</span>
         <input type="text" value={vals.firstGoalBrazil} onChange={update('firstGoalBrazil')} placeholder="ex: Vinícius Jr." />
       </label>
       <label className="pred-field">
-        <span>Último gol do Brasil na copa (20 pts)</span>
+        <span>Último gol do Brasil na copa (25 pts)</span>
         <input type="text" value={vals.lastGoalBrazil} onChange={update('lastGoalBrazil')} placeholder="ex: Rodrygo" />
       </label>
       <label className="pred-field">

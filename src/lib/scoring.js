@@ -334,11 +334,11 @@ export function scoreExtras(predicted = {}, actual = {}, teamBoosts = {}) {
   // 4. Top scorer goal count (20 pts, EXACT only)
   total += scoreExactNumber(predicted.topScorerGoals, actual.topScorerGoals, 20);
 
-  // 5. First goal scorer for Brazil (30 pts)
-  total += scoreExactText(predicted.firstGoalBrazil, actual.firstGoalBrazil, 30);
+  // 5. First goal scorer for Brazil (25 pts)
+  total += scoreExactText(predicted.firstGoalBrazil, actual.firstGoalBrazil, 25);
 
-  // 6. Last goal scorer for Brazil (20 pts)
-  total += scoreExactText(predicted.lastGoalBrazil, actual.lastGoalBrazil, 20);
+  // 6. Last goal scorer for Brazil (25 pts) — same value as first goal
+  total += scoreExactText(predicted.lastGoalBrazil, actual.lastGoalBrazil, 25);
 
   // 7. 100th goal of the WC (50 pts)
   total += scoreExactText(predicted.hundredthGoal, actual.hundredthGoal, 50);
