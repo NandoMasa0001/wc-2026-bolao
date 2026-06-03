@@ -54,7 +54,7 @@ async function downloadFullBackup() {
 export default function AdminPage() {
   const { session } = useAuth();
   const {
-    me, config, teams, matches, teamsByCode, players,
+    me, config, teams, matches, teamsByCode, players, adminActions,
     saveMatchResult, updateConfig, updateConfigResults, recomputeAllScores, deletePlayer
   } = useData();
   const { show } = useToast();
@@ -66,6 +66,22 @@ export default function AdminPage() {
   return (
     <>
       <h2 className="page-title">Admin</h2>
+
+      <section className="page-section">
+        <h3 className="page-section__title">Pré-flight (checagem rápida)</h3>
+        <Preflight config={config} teams={teams} matches={matches} players={players} />
+      </section>
+
+      <section className="page-section">
+        <h3 className="page-section__title">Travas</h3>
+        <PauseToggle
+          config={config}
+          onToggle={(open) => {
+            updateConfig({ predictionsOpen: open });
+            show(open ? 'Palpites destravados' : 'Palpites pausados', { variant: 'info' });
+          }}
+        />
+      </section>
 
       <section className="page-section">
         <h3 className="page-section__title">Vencedores dos prêmios</h3>
@@ -138,19 +154,15 @@ export default function AdminPage() {
 
       <section className="page-section">
         <h3 className="page-section__title">Recalcular</h3>
-        <Card>
-          <p className="muted">
-            Roda novamente a engine de pontuação em todos os palpites. Use depois de sobrescrever um jogo manualmente.
-          </p>
-          <div style={{ marginTop: 'var(--sp-3)' }}>
-            <Button variant="secondary" onClick={() => {
-              recomputeAllScores();
-              show('Pontuações recalculadas', { variant: 'success' });
-            }}>
-              Recalcular todas as pontuações
-            </Button>
-          </div>
-        </Card>
+        <RecomputeCard onRun={() => {
+          recomputeAllScores();
+          show('Pedido de recálculo registrado — o cron processa em até 10 min', { variant: 'success' });
+        }} />
+      </section>
+
+      <section className="page-section">
+        <h3 className="page-section__title">Histórico de ações admin</h3>
+        <AdminActionsLog rows={adminActions} />
       </section>
     </>
   );
@@ -486,6 +498,222 @@ function ExtrasResults({ teams, current, onSave }) {
           Salvar resultados extras
         </Button>
       </div>
+    </Card>
+  );
+}
+
+/* ====================================================================== */
+/* Preflight checklist — quick visual of league health on /admin top      */
+/* ====================================================================== */
+
+function Preflight({ config, teams, matches, players }) {
+  const now = Date.now();
+  const tournamentTs = config?.tournamentStartsAt ? new Date(config.tournamentStartsAt).getTime() : null;
+  const firstKickoffTs = matches.length
+    ? Math.min(...matches.map(m => new Date(m.kickoffAt).getTime()).filter(Number.isFinite))
+    : null;
+  const lastFetchTs = config?.lastFetchAt ? new Date(config.lastFetchAt).getTime() : null;
+  const matchesWithoutKickoff = matches.filter(m => !m.kickoffAt).length;
+  const dupNames = (() => {
+    const seen = new Map();
+    for (const p of players) {
+      const k = (p.name || '').trim().toLowerCase();
+      if (!k) continue;
+      seen.set(k, (seen.get(k) || 0) + 1);
+    }
+    return [...seen.entries()].filter(([, n]) => n > 1).map(([k]) => k);
+  })();
+  const cronAgeMin = lastFetchTs ? Math.round((now - lastFetchTs) / 60000) : null;
+
+  // Each check: ok | warn | bad, with a human label.
+  const checks = [
+    {
+      label: '48 seleções carregadas',
+      status: teams.length === 48 ? 'ok' : teams.length === 0 ? 'bad' : 'warn',
+      detail: `${teams.length} seleções`
+    },
+    {
+      label: '104 jogos carregados',
+      status: matches.length === 104 ? 'ok' : matches.length === 0 ? 'bad' : 'warn',
+      detail: `${matches.length} jogos`
+    },
+    {
+      label: 'Todos os jogos com kickoff',
+      status: matchesWithoutKickoff === 0 ? 'ok' : 'bad',
+      detail: matchesWithoutKickoff === 0 ? 'OK' : `${matchesWithoutKickoff} sem`
+    },
+    {
+      label: 'Apito inicial bate com primeiro jogo',
+      status: (tournamentTs && firstKickoffTs && Math.abs(tournamentTs - firstKickoffTs) < 60 * 60 * 1000) ? 'ok' :
+              (tournamentTs && firstKickoffTs) ? 'warn' : 'bad',
+      detail: tournamentTs && firstKickoffTs
+        ? `Δ ${Math.round((firstKickoffTs - tournamentTs) / 60000)} min`
+        : 'falta config'
+    },
+    {
+      label: 'Cron de resultados ativo (< 30 min)',
+      status: cronAgeMin == null ? 'warn' : cronAgeMin <= 30 ? 'ok' : cronAgeMin <= 120 ? 'warn' : 'bad',
+      detail: cronAgeMin == null ? 'nunca rodou (ou migration 0008 pendente)' :
+              cronAgeMin < 60 ? `${cronAgeMin} min atrás` :
+              `${Math.round(cronAgeMin / 60)} h atrás`
+    },
+    {
+      label: 'Sem nomes de jogador duplicados',
+      status: dupNames.length === 0 ? 'ok' : 'warn',
+      detail: dupNames.length === 0 ? 'OK' : dupNames.join(', ')
+    }
+  ];
+  const allOk = checks.every(c => c.status === 'ok');
+
+  return (
+    <Card>
+      <p className="muted" style={{ marginBottom: 'var(--sp-3)' }}>
+        {allOk ? 'Tudo verde — a liga está pronta pro apito inicial.' : 'Atenção: revisar os pontos em amarelo/vermelho.'}
+      </p>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
+        {checks.map(c => (
+          <li
+            key={c.label}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '24px 1fr auto',
+              alignItems: 'center',
+              gap: 'var(--sp-2)',
+              padding: 'var(--sp-2) var(--sp-3)',
+              background: 'var(--bg-app)',
+              borderRadius: 'var(--r-md)',
+              border: c.status === 'bad'  ? '1px solid var(--c-red)' :
+                      c.status === 'warn' ? '1px solid var(--c-orange)' :
+                                            '1px solid var(--border)'
+            }}
+          >
+            <span aria-hidden="true" style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 'var(--fw-black)',
+              color: c.status === 'ok'   ? 'var(--c-green)'  :
+                     c.status === 'warn' ? 'var(--c-orange)' :
+                                           'var(--c-red)'
+            }}>
+              {c.status === 'ok' ? '✓' : c.status === 'warn' ? '⚠' : '✗'}
+            </span>
+            <span style={{ fontWeight: 'var(--fw-semibold)' }}>{c.label}</span>
+            <span className="muted" style={{ fontSize: 'var(--fs-small)' }}>{c.detail}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+/* ====================================================================== */
+/* Pause toggle — flip predictions_open                                   */
+/* ====================================================================== */
+
+function PauseToggle({ config, onToggle }) {
+  const open = config?.predictionsOpen !== false; // default true
+  return (
+    <Card>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--sp-3)' }}>
+        <div style={{ minWidth: 0 }}>
+          <strong>Palpites estão {open ? 'ABERTOS' : 'PAUSADOS'}</strong>
+          <p className="muted" style={{ margin: 'var(--sp-1) 0 0', fontSize: 'var(--fs-small)' }}>
+            Trava de emergência client-side. Pausa esconde botões de salvar em todo o app —
+            use se descobrir algo errado no apito e precisar congelar enquanto investiga.
+            (A trava forte continua sendo a RLS por data; isso é só pro caso da gente
+            precisar pausar antes ou no meio.)
+          </p>
+        </div>
+        <Button
+          variant={open ? 'danger' : 'primary'}
+          onClick={() => onToggle(!open)}
+        >
+          {open ? 'Pausar palpites' : 'Destravar palpites'}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/* ====================================================================== */
+/* Recompute card — typed confirmation                                    */
+/* ====================================================================== */
+
+function RecomputeCard({ onRun }) {
+  const [text, setText] = useState('');
+  const phrase = 'RECALCULAR';
+  return (
+    <Card>
+      <p className="muted">
+        Roda a engine de pontuação em todos os palpites no próximo ciclo do cron.
+        Use depois de sobrescrever um jogo manualmente.
+      </p>
+      <label className="pred-field" style={{ marginTop: 'var(--sp-3)' }}>
+        <span>Pra confirmar, digite <code>{phrase}</code>:</span>
+        <input
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={phrase}
+          autoComplete="off"
+        />
+      </label>
+      <div style={{ marginTop: 'var(--sp-3)' }}>
+        <Button
+          variant="secondary"
+          disabled={text !== phrase}
+          onClick={() => { onRun(); setText(''); }}
+        >
+          Recalcular todas as pontuações
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/* ====================================================================== */
+/* Admin actions audit log                                                */
+/* ====================================================================== */
+
+function AdminActionsLog({ rows }) {
+  if (!rows || rows.length === 0) {
+    return (
+      <Card>
+        <p className="muted">Sem ações admin registradas ainda. (Ou esta liga não rodou a migration 0008.)</p>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <p className="muted" style={{ marginBottom: 'var(--sp-3)' }}>
+        Últimas {rows.length} ações administrativas (mais recente primeiro). Útil pro post-mortem.
+      </p>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 'var(--fs-small)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-1)' }}>
+        {rows.slice(0, 25).map(r => (
+          <li
+            key={r.id}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'auto 1fr auto',
+              gap: 'var(--sp-2)',
+              padding: 'var(--sp-2) var(--sp-3)',
+              background: 'var(--bg-app)',
+              borderRadius: 'var(--r-md)',
+              border: '1px solid var(--border)'
+            }}
+          >
+            <span className="muted" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {new Date(r.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </span>
+            <span>
+              <strong>{r.actor_name || '?'}</strong> → <code>{r.action}</code>
+              {r.target ? <> <span className="muted">({r.target})</span></> : null}
+            </span>
+            <span className="muted" style={{ fontSize: 'var(--fs-tiny)' }}>
+              {r.payload ? JSON.stringify(r.payload).slice(0, 60) : ''}
+            </span>
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }

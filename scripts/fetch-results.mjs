@@ -424,6 +424,19 @@ async function runForLeague({ league, apiMatches, championOdds, primaryResults }
     if (error) console.error(`${tag} update player ${p.id}:`, error.message);
   }
 
+  // Stamp last-fetch timestamp so the /admin preflight can flag a
+  // stale cron. Failure here is non-fatal — old column on a not-yet-
+  // migrated DB just gets ignored.
+  {
+    const { error: stampErr } = await supabase
+      .from('config')
+      .update({ last_fetch_at: new Date().toISOString() })
+      .eq('id', 'tournament');
+    if (stampErr && !/column .* does not exist/i.test(stampErr.message)) {
+      console.warn(`${tag} could not stamp last_fetch_at: ${stampErr.message}`);
+    }
+  }
+
   console.log(`${tag} done (${playerUpdates.length} players scored).`);
 
   // Return the primary league's results so secondaries can sync.

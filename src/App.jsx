@@ -14,6 +14,7 @@ import LeaderboardPage from './pages/LeaderboardPage.jsx';
 import RegulamentoPage from './pages/RegulamentoPage.jsx';
 import ConsensoPage from './pages/ConsensoPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
+import StatusPage from './pages/StatusPage.jsx';
 
 import './App.css';
 
@@ -28,7 +29,7 @@ function ProtectedRoute({ children }) {
 
 function AppShell({ children }) {
   const { session, signOut } = useAuth();
-  const { me } = useData();
+  const { me, config } = useData();
 
   const baseTabs = [
     { to: '/matches',      label: 'Jogos',         icon: IconBall },
@@ -37,6 +38,8 @@ function AppShell({ children }) {
     { to: '/regulamento',  label: 'Regras',        icon: IconBook }
   ];
   if (me?.isAdmin) baseTabs.push({ to: '/admin', label: 'Admin', icon: IconCog });
+
+  const paused = config?.predictionsOpen === false;
 
   return (
     <div className="app-shell">
@@ -52,6 +55,18 @@ function AppShell({ children }) {
           </button>
         )}
       </header>
+      {paused && (
+        <div role="alert" style={{
+          background: 'var(--c-orange)',
+          color: '#fff',
+          padding: 'var(--sp-2) var(--sp-3)',
+          textAlign: 'center',
+          fontWeight: 'var(--fw-semibold)',
+          fontSize: 'var(--fs-small)'
+        }}>
+          ⏸ Palpites pausados pelo admin. Nenhum save vai funcionar até reabrir.
+        </div>
+      )}
       <main className="app-main">{children}</main>
       <Tabs items={baseTabs} />
     </div>
@@ -115,6 +130,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AppShell><AdminPage /></AppShell>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/status"
+        element={
+          <ProtectedRoute>
+            <AppShell><StatusPage /></AppShell>
           </ProtectedRoute>
         }
       />

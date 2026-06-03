@@ -268,6 +268,7 @@ function MockDataProvider({ children }) {
       extraPredictions,
       teamBoosts,
       me, loading: false,
+      adminActions: [], logAdminAction: async () => {},
       savePrediction, saveMatchResult, confirmAdvancement, saveFinalists,
       saveAwards, savePollPrediction, saveExtras, updateConfig, updateConfigResults,
       deletePlayer, recomputeAllScores
@@ -302,7 +303,8 @@ const fromConfigRow = (r) => r ? ({
   pollVotingOpen:       r.poll_voting_open,
   awardsAnnounced:      r.awards_announced,
   results:              r.results || {},
-  tournamentOdds:       r.tournament_odds || {}
+  tournamentOdds:       r.tournament_odds || {},
+  lastFetchAt:          r.last_fetch_at || null
 }) : null;
 
 const fromTeamRow = (r) => ({
@@ -385,6 +387,7 @@ function SupabaseDataProvider({ children }) {
   const [awardPredictions, setAwardPredictions] = useState({});
   const [pollPredictions, setPollPredictions] = useState({});
   const [extraPredictions, setExtraPredictions] = useState({});
+  const [adminActions, setAdminActions] = useState([]); // audit log rows
   const [loading, setLoading] = useState(true);
 
   /* -------------- Initial fetch + realtime channels -------------- */
@@ -461,6 +464,18 @@ function SupabaseDataProvider({ children }) {
       ]);
 
       if (cancelled) return;
+
+      // Audit log (best-effort — table may not exist if migration 0008
+      // hasn't been applied to this league yet; we silently fall back
+      // to an empty list so /admin can keep rendering.)
+      try {
+        const { data: aaRows } = await supabase
+          .from('admin_actions')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100);
+        if (aaRows) setAdminActions(aaRows);
+      } catch { /* table missing — ignore */ }
 
       if (cfgRes.data)     setConfig(fromConfigRow(cfgRes.data));
       if (teamsRes.data)   setTeams(teamsRes.data.map(fromTeamRow));
@@ -629,8 +644,14 @@ function SupabaseDataProvider({ children }) {
   );
 
   /* -------------- Mutators -------------- */
+  // Soft pause: admin can flip predictions_open to false in /admin to
+  // freeze every saver. The hard lock is still the RLS check against
+  // tournament_starts_at; this one stops in-app before hitting Postgres.
+  const paused = config?.predictionsOpen === false;
+
   const savePrediction = useCallback(async (matchId, { homeScore, awayScore, advancer }) => {
     if (!session) return;
+    if (paused) { console.warn('savePrediction blocked — predictions paused'); return; }
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
     const payload = {
@@ -642,17 +663,21 @@ function SupabaseDataProvider({ children }) {
       points: 0,
       updated_at: new Date().toISOString()
     };
-    // Only include `advancer` when it actually has a value. Some leagues
-    // haven't applied migration 0007 yet, so the column doesn't exist
-    // there — sending `advancer: null` would make the whole upsert fail
-    // with "column does not exist". For group matches advancer is always
-    // null anyway, and knockouts don't unlock until the group stage ends.
     if (advancer != null) payload.advancer = advancer;
+
+    // Safety-net: keep a local copy of every save in localStorage. If
+    // Supabase has a wobble during a match, the user (or admin) can
+    // recover the picks from the browser. Single row per (player, match).
+    try {
+      const key = `bolao-pred-${session.id}-${matchId}`;
+      localStorage.setItem(key, JSON.stringify({ ...payload, savedAt: new Date().toISOString() }));
+    } catch { /* private mode / quota — ignore */ }
+
     const { error } = await supabase
       .from('predictions')
       .upsert(payload, { onConflict: 'player_id,match_id' });
     if (error) console.error('savePrediction', error);
-  }, [session, matches]);
+  }, [session, matches, paused]);
 
   const saveMatchResult = useCallback(async (matchId, { homeScore, awayScore, status }) => {
     if (!me?.isAdmin) return;
@@ -661,10 +686,12 @@ function SupabaseDataProvider({ children }) {
       .update({ home_score: homeScore, away_score: awayScore, status })
       .eq('id', matchId);
     if (error) console.error('saveMatchResult', error);
+    else { /* fire-and-forget log */ logAdminAction('match.override', matchId, { homeScore, awayScore, status }); }
   }, [me]);
 
   const confirmAdvancement = useCallback(async (teamsArr) => {
     if (!session) return;
+    if (paused) { console.warn('confirmAdvancement blocked — predictions paused'); return; }
     const { error } = await supabase
       .from('advancement_predictions')
       .upsert({
@@ -674,19 +701,21 @@ function SupabaseDataProvider({ children }) {
         points: 0
       }, { onConflict: 'player_id' });
     if (error) console.error('confirmAdvancement', error);
-  }, [session]);
+  }, [session, paused]);
 
   const saveFinalists = useCallback(async (finalists) => {
     if (!session) return;
+    if (paused) { console.warn('saveFinalists blocked — predictions paused'); return; }
     const { error } = await supabase
       .from('finals_predictions')
       .upsert({ player_id: session.id, finalists, points: 0 },
               { onConflict: 'player_id' });
     if (error) console.error('saveFinalists', error);
-  }, [session]);
+  }, [session, paused]);
 
   const saveAwards = useCallback(async ({ bestPlayer, youngPlayer, goalkeeper, topScorer }) => {
     if (!session) return;
+    if (paused) { console.warn('saveAwards blocked — predictions paused'); return; }
     const { error } = await supabase
       .from('award_predictions')
       .upsert({
@@ -698,10 +727,11 @@ function SupabaseDataProvider({ children }) {
         points: 0
       }, { onConflict: 'player_id' });
     if (error) console.error('saveAwards', error);
-  }, [session]);
+  }, [session, paused]);
 
   const savePollPrediction = useCallback(async ({ darkHorse, disappointment }) => {
     if (!session) return;
+    if (paused) { console.warn('savePollPrediction blocked — predictions paused'); return; }
     const { error } = await supabase
       .from('poll_predictions')
       .upsert({
@@ -711,10 +741,11 @@ function SupabaseDataProvider({ children }) {
         points: 0
       }, { onConflict: 'player_id' });
     if (error) console.error('savePollPrediction', error);
-  }, [session]);
+  }, [session, paused]);
 
   const saveExtras = useCallback(async (extras) => {
     if (!session) return;
+    if (paused) { console.warn('saveExtras blocked — predictions paused'); return; }
     // Partial update: only override fields that are explicitly present in
     // `extras`. Fields not passed get preserved from the existing row.
     const numOrNull = (v) => (v === '' || v == null ? null : Number(v));
@@ -751,6 +782,22 @@ function SupabaseDataProvider({ children }) {
     if (error) console.error('saveExtras', error);
   }, [session]);
 
+  // Audit log writer. Best-effort: if the admin_actions table isn't
+  // available on this league yet (pre-0008 migration), we silently fail
+  // so admin work isn't blocked. Otherwise inserts one row per action.
+  const logAdminAction = useCallback(async (action, target, payload) => {
+    if (!me?.isAdmin) return;
+    try {
+      await supabase.from('admin_actions').insert({
+        actor_id:   session?.id,
+        actor_name: me.name,
+        action,
+        target: target ?? null,
+        payload: payload ?? null
+      });
+    } catch { /* table missing — ignore */ }
+  }, [me, session]);
+
   const updateConfig = useCallback(async (patch) => {
     if (!me?.isAdmin) return;
     // Convert camelCase patch keys to snake_case columns we know about.
@@ -765,7 +812,8 @@ function SupabaseDataProvider({ children }) {
     if (Object.keys(row).length === 0) return;
     const { error } = await supabase.from('config').update(row).eq('id', 'tournament');
     if (error) console.error('updateConfig', error);
-  }, [me]);
+    else logAdminAction('config.update', 'tournament', patch);
+  }, [me, logAdminAction]);
 
   const updateConfigResults = useCallback(async (patch) => {
     if (!me?.isAdmin) return;
@@ -775,21 +823,25 @@ function SupabaseDataProvider({ children }) {
       .update({ results: merged })
       .eq('id', 'tournament');
     if (error) console.error('updateConfigResults', error);
-  }, [me, config]);
+    else logAdminAction('config.results.update', 'tournament', patch);
+  }, [me, config, logAdminAction]);
 
   const deletePlayer = useCallback(async (playerId) => {
     if (!me?.isAdmin) return;
+    const victim = players.find(p => p.id === playerId);
     // RLS allows admin to delete; ON DELETE CASCADE removes predictions/etc.
     // The auth.users row stays — if they log back in with same name+PIN
     // they'll get a fresh players row (with no points). Admin can re-delete.
     const { error } = await supabase.from('players').delete().eq('id', playerId);
     if (error) console.error('deletePlayer', error);
-  }, [me]);
+    else logAdminAction('player.delete', playerId, { name: victim?.name });
+  }, [me, players, logAdminAction]);
 
   const recomputeAllScores = useCallback(async () => {
     // The cron is authoritative in Supabase mode. UI just surfaces a notice.
     console.warn('recomputeAllScores in Supabase mode is owned by the GitHub Actions cron — trigger a manual run there.');
-  }, []);
+    logAdminAction('scores.recompute_request', null, null);
+  }, [logAdminAction]);
 
   const value = useMemo(
     () => ({
@@ -800,6 +852,7 @@ function SupabaseDataProvider({ children }) {
       extraPredictions,
       teamBoosts,
       me, loading,
+      adminActions, logAdminAction,
       savePrediction, saveMatchResult, confirmAdvancement, saveFinalists,
       saveAwards, savePollPrediction, saveExtras, updateConfig, updateConfigResults,
       deletePlayer, recomputeAllScores
@@ -812,6 +865,7 @@ function SupabaseDataProvider({ children }) {
       extraPredictions,
       teamBoosts,
       me, loading,
+      adminActions, logAdminAction,
       savePrediction, saveMatchResult, confirmAdvancement, saveFinalists,
       saveAwards, savePollPrediction, saveExtras, updateConfig, updateConfigResults,
       deletePlayer, recomputeAllScores

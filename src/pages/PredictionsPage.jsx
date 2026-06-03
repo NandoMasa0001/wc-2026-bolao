@@ -12,6 +12,30 @@ import { computeStandings, predictedMatchesFromPlayer } from '../lib/standings.j
 import { buildFullBracket, buildBracketColumns } from '../lib/predictedBracket.js';
 import './PredictionsPage.css';
 
+function downloadMyPredictions({ me, predictionsByMatchForMe, advancementPredictions, finalsPredictions, awardPredictions, pollPredictions, extraPredictions }) {
+  const data = {
+    player:  { id: me.id, name: me.name },
+    dumpedAt: new Date().toISOString(),
+    schemaVersion: 1,
+    matches:     predictionsByMatchForMe,
+    advancement: advancementPredictions[me.id] || null,
+    finalists:   finalsPredictions[me.id]     || null,
+    awards:      awardPredictions[me.id]      || null,
+    poll:        pollPredictions[me.id]       || null,
+    extras:      extraPredictions[me.id]      || null
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.download = `meus-palpites-${(me.name || 'jogador').toLowerCase().replace(/\s+/g, '_')}-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 const TABS = [
   { key: 'advancement', label: 'Classificação' },
   { key: 'especiais',   label: 'Especiais' }
@@ -57,7 +81,28 @@ export default function PredictionsPage() {
 
   return (
     <>
-      <h2 className="page-title">Meus palpites</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--sp-3)', flexWrap: 'wrap' }}>
+        <h2 className="page-title" style={{ marginBottom: 0 }}>Meus palpites</h2>
+        {me && (
+          <button
+            type="button"
+            onClick={() => downloadMyPredictions({ me, predictionsByMatchForMe, advancementPredictions, finalsPredictions, awardPredictions, pollPredictions, extraPredictions })}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-pill)',
+              padding: '4px var(--sp-3)',
+              fontSize: 'var(--fs-small)',
+              fontFamily: 'var(--font-body)',
+              fontWeight: 'var(--fw-semibold)',
+              color: 'var(--text-muted)',
+              cursor: 'pointer'
+            }}
+          >
+            ⬇ Baixar meus palpites (.json)
+          </button>
+        )}
+      </div>
 
       <PendingChecklist
         me={me}
