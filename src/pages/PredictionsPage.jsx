@@ -8,7 +8,6 @@ import Pill from '../components/Pill.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { useData } from '../context/DataContext.jsx';
 import { computeStandings, predictedMatchesFromPlayer } from '../lib/standings.js';
-import { finalistBoost } from '../lib/scoring.js';
 import { buildFullBracket, buildBracketColumns } from '../lib/predictedBracket.js';
 import './PredictionsPage.css';
 
@@ -692,11 +691,11 @@ function FinalistsTab({ teams, current, teamBoosts = {}, onSave }) {
     <Card id="sec-finalistas">
       <h3 className="pred-section-title">Escolha os dois finalistas</h3>
       <p className="muted">
-        20 pontos × multiplicador por finalista correto. O multiplicador de zebra é mais suave do que o do campeão (porque chegar à final é bem mais fácil que ganhar a copa) — favorito = 1×, azarão extremo = 1.75×.
+        20 pontos × multiplicador por finalista correto. Usa o mesmo boost do campeão (log-prob das odds atuais) — favorito = 1×, azarão extremo = 2.5×.
       </p>
       <div className="pred-finalists__grid">
         {visibleTeams.map(team => {
-          const boost = finalistBoost(teamBoosts[team.code] || 1);
+          const boost = teamBoosts[team.code] || 1;
           return (
             <button
               type="button"

@@ -225,23 +225,9 @@ export function scoreAdvancement(predictedTeams = [], actualAdvancing = []) {
 }
 
 /**
- * Compress factor applied to the champion-derived boost when scoring
- * finalists. Reaching the final is roughly twice as likely as winning
- * the cup, so the boost spread (favorite → long shot) should be
- * compressed proportionally — otherwise picking a 2.5× zebra to finish
- * 2nd would pay 50 pts vs 20 pts for a favorite, an exaggeration.
- *
- * Effective range with 0.5: 1.00× (favorite) → 1.75× (max long shot).
- */
-export const FINALIST_BOOST_COMPRESS = 0.5;
-
-export function finalistBoost(championBoost = 1) {
-  return 1 + Math.max(0, championBoost - 1) * FINALIST_BOOST_COMPRESS;
-}
-
-/**
- * Finalists: 20 × correct. Per-team boost applies, but compressed
- * (see FINALIST_BOOST_COMPRESS) so zebra picks don't blow up the score.
+ * Finalists: 20 × correct. Uses the same per-team boost as champion
+ * (log-prob mapping from championship odds), so the gradient between
+ * favorites mirrors the real-odds spread instead of being flattened.
  */
 export function scoreFinalists(predictedFinalists = [], actualFinalists = [], teamBoosts = {}) {
   if (!predictedFinalists.length || !actualFinalists.length) return 0;
@@ -249,7 +235,7 @@ export function scoreFinalists(predictedFinalists = [], actualFinalists = [], te
   let total = 0;
   for (const code of predictedFinalists) {
     if (!actualSet.has(code)) continue;
-    const boost = finalistBoost(teamBoosts[code] ?? 1);
+    const boost = teamBoosts[code] ?? 1;
     total += Math.ceil(20 * boost);
   }
   return total;
