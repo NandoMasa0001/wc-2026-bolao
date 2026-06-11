@@ -192,7 +192,7 @@ async function runForLeague({ league, apiMatches, championOdds, primaryResults, 
       const chunk = ids.slice(i, i + 100);
       const { data } = await supabase
         .from('matches')
-        .select('id, status, home_score, away_score')
+        .select('id, status, home_score, away_score, winner')
         .in('id', chunk);
       for (const r of data || []) existingById[r.id] = r;
     }
@@ -227,10 +227,13 @@ async function runForLeague({ league, apiMatches, championOdds, primaryResults, 
         base.winner     = m.winner;
       } else if (dbHasScore) {
         // DB has an admin-entered score but API doesn't know yet —
-        // preserve DB.
+        // preserve DB. Important: include `winner` explicitly so the
+        // supabase-js client (which normalises mixed-key rows) doesn't
+        // null it out when another row in the batch has winner set.
         base.status     = existing.status;
         base.home_score = existing.home_score;
         base.away_score = existing.away_score;
+        base.winner     = existing.winner;
       } else {
         // Neither side has a score: just take API's status (scheduled/
         // live without numbers), keep scores null.
