@@ -123,7 +123,7 @@ async function flushUpdates(supabase, table, rows, onConflict, name) {
 /* Process one league's database.                                       */
 /* -------------------------------------------------------------------- */
 
-async function runForLeague({ league, apiMatches, championOdds, primaryResults }) {
+async function runForLeague({ league, apiMatches, championOdds, primaryResults, primaryMatches }) {
   const tag = `[${league.name}]`;
   console.log(`${tag} processing…`);
 
@@ -174,17 +174,19 @@ async function runForLeague({ league, apiMatches, championOdds, primaryResults }
   }
 
   // ---- Upsert matches ----
-  // Never clobber an admin override (manually entered result) with stale
-  // API data. We do this by:
-  //   1. Always upserting the static fields (teams, stage, kickoff)
-  //   2. Only upserting status/scores from API when the API has actually
-  //      progressed — i.e. it returned a non-scheduled status or has
-  //      real scores. If API still says "scheduled" with null scores
-  //      AND the DB already has a finished record, leave the DB alone.
-  if (!scoringOnly && apiMatches.length > 0) {
+  // Source of truth for the match table:
+  //   - Primary league: API (with admin-override preservation, see below)
+  //   - Secondary leagues: PRIMARY league's matches table. This lets the
+  //     admin enter a result once on the primary and have it ripple to
+  //     all other leagues automatically.
+  const matchSource = league.isPrimary === false && primaryMatches?.length
+    ? primaryMatches
+    : apiMatches;
+
+  if (!scoringOnly && matchSource.length > 0) {
     // Read current DB state to know which matches already have a result
-    // we shouldn't overwrite.
-    const ids = apiMatches.map(m => m.id);
+    // we shouldn't overwrite (when source is API).
+    const ids = matchSource.map(m => m.id);
     const existingById = {};
     for (let i = 0; i < ids.length; i += 100) {
       const chunk = ids.slice(i, i + 100);
@@ -195,10 +197,14 @@ async function runForLeague({ league, apiMatches, championOdds, primaryResults }
       for (const r of data || []) existingById[r.id] = r;
     }
 
-    const rows = apiMatches.map((m) => {
+    const rows = matchSource.map((m) => {
       const existing = existingById[m.id];
-      const apiHasResult = m.status !== 'scheduled' || m.homeScore != null;
-      const dbHasResult  = existing && (existing.status === 'finished' || existing.home_score != null);
+      // The score is what matters for protecting admin overrides — status
+      // alone is unreliable (API can mark a match FINISHED but still
+      // have null home/away scores for hours; if we trusted status here,
+      // we'd clobber the manual placar back to null).
+      const apiHasScore = m.homeScore != null && m.awayScore != null;
+      const dbHasScore  = existing && existing.home_score != null && existing.away_score != null;
 
       const base = {
         id: m.id,
@@ -213,19 +219,25 @@ async function runForLeague({ league, apiMatches, championOdds, primaryResults }
         kickoff_at: new Date(m.kickoffAt).toISOString()
       };
 
-      // Take the API's status/scores only if the API is ahead of DB.
-      // If DB already has a result and API doesn't, preserve DB.
-      if (apiHasResult || !dbHasResult) {
+      if (apiHasScore) {
+        // API knows the score → it's the truth, overwrite any DB state.
         base.status     = m.status;
         base.home_score = m.homeScore;
         base.away_score = m.awayScore;
         base.winner     = m.winner;
-      } else {
-        // Keep DB's existing status/scores — don't include them in upsert
-        // so onConflict preserves whatever's there.
+      } else if (dbHasScore) {
+        // DB has an admin-entered score but API doesn't know yet —
+        // preserve DB.
         base.status     = existing.status;
         base.home_score = existing.home_score;
         base.away_score = existing.away_score;
+      } else {
+        // Neither side has a score: just take API's status (scheduled/
+        // live without numbers), keep scores null.
+        base.status     = m.status;
+        base.home_score = m.homeScore;
+        base.away_score = m.awayScore;
+        base.winner     = m.winner;
       }
       return base;
     });
@@ -524,12 +536,40 @@ async function main() {
     primaryResults: null
   });
 
+  // Re-read primary's final matches state (post-upsert with any admin
+  // overrides preserved) so secondaries inherit from it. This makes the
+  // admin's manual entry on the primary league propagate automatically
+  // to every secondary league.
+  let primaryMatches = [];
+  if (!scoringOnly) {
+    const primaryClient = makeClient(primary.url, primary.key);
+    const { data } = await primaryClient.from('matches').select('*');
+    primaryMatches = (data || []).map(r => ({
+      id: r.id,
+      apiId: r.api_id,
+      stage: r.stage,
+      group: r.group_letter,
+      matchday: r.matchday,
+      homeTeam: r.home_team,
+      awayTeam: r.away_team,
+      homePlaceholder: r.home_placeholder,
+      awayPlaceholder: r.away_placeholder,
+      kickoffAt: r.kickoff_at,
+      status: r.status,
+      homeScore: r.home_score,
+      awayScore: r.away_score,
+      winner: r.winner
+    }));
+    console.log(`Captured ${primaryMatches.length} matches from primary (${primary.name}) for secondary propagation.`);
+  }
+
   for (const league of others) {
     await runForLeague({
       league,
       apiMatches,
       championOdds: championOddsByName,
-      primaryResults
+      primaryResults,
+      primaryMatches
     });
   }
 
