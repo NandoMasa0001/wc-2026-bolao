@@ -174,23 +174,62 @@ async function runForLeague({ league, apiMatches, championOdds, primaryResults }
   }
 
   // ---- Upsert matches ----
+  // Never clobber an admin override (manually entered result) with stale
+  // API data. We do this by:
+  //   1. Always upserting the static fields (teams, stage, kickoff)
+  //   2. Only upserting status/scores from API when the API has actually
+  //      progressed — i.e. it returned a non-scheduled status or has
+  //      real scores. If API still says "scheduled" with null scores
+  //      AND the DB already has a finished record, leave the DB alone.
   if (!scoringOnly && apiMatches.length > 0) {
-    const rows = apiMatches.map((m) => ({
-      id: m.id,
-      api_id: m.apiId ?? null,
-      stage: m.stage,
-      group_letter: m.group,
-      matchday: m.matchday,
-      home_team: m.homeTeam,
-      away_team: m.awayTeam,
-      home_placeholder: m.homePlaceholder,
-      away_placeholder: m.awayPlaceholder,
-      kickoff_at: new Date(m.kickoffAt).toISOString(),
-      status: m.status,
-      home_score: m.homeScore,
-      away_score: m.awayScore,
-      winner: m.winner
-    }));
+    // Read current DB state to know which matches already have a result
+    // we shouldn't overwrite.
+    const ids = apiMatches.map(m => m.id);
+    const existingById = {};
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100);
+      const { data } = await supabase
+        .from('matches')
+        .select('id, status, home_score, away_score')
+        .in('id', chunk);
+      for (const r of data || []) existingById[r.id] = r;
+    }
+
+    const rows = apiMatches.map((m) => {
+      const existing = existingById[m.id];
+      const apiHasResult = m.status !== 'scheduled' || m.homeScore != null;
+      const dbHasResult  = existing && (existing.status === 'finished' || existing.home_score != null);
+
+      const base = {
+        id: m.id,
+        api_id: m.apiId ?? null,
+        stage: m.stage,
+        group_letter: m.group,
+        matchday: m.matchday,
+        home_team: m.homeTeam,
+        away_team: m.awayTeam,
+        home_placeholder: m.homePlaceholder,
+        away_placeholder: m.awayPlaceholder,
+        kickoff_at: new Date(m.kickoffAt).toISOString()
+      };
+
+      // Take the API's status/scores only if the API is ahead of DB.
+      // If DB already has a result and API doesn't, preserve DB.
+      if (apiHasResult || !dbHasResult) {
+        base.status     = m.status;
+        base.home_score = m.homeScore;
+        base.away_score = m.awayScore;
+        base.winner     = m.winner;
+      } else {
+        // Keep DB's existing status/scores — don't include them in upsert
+        // so onConflict preserves whatever's there.
+        base.status     = existing.status;
+        base.home_score = existing.home_score;
+        base.away_score = existing.away_score;
+      }
+      return base;
+    });
+
     for (let i = 0; i < rows.length; i += 100) {
       const chunk = rows.slice(i, i + 100);
       const { error } = await supabase.from('matches').upsert(chunk, { onConflict: 'id' });
