@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import Card from '../components/Card.jsx';
 import Button from '../components/Button.jsx';
@@ -299,7 +299,60 @@ function PollAdmin({ teams, config, onToggle, onSetResult }) {
 }
 
 function MatchOverride({ matches, teamsByCode, onSave }) {
-  const [matchId, setMatchId] = useState(matches[0]?.id || '');
+  const [showAll, setShowAll] = useState(false);
+
+  // "Precisa de atenção" = kickoff já rolou MAS o placar ainda não está
+  // definido (status != finished OU scores nulos). Esse é o caso comum
+  // pro admin: o jogo acabou de terminar e a gente quer entrar o placar.
+  // Ordenado do mais recente pro mais antigo — o que acabou de acabar
+  // fica no topo.
+  const needsAttention = useMemo(() => {
+    const now = Date.now();
+    return matches
+      .filter(m => new Date(m.kickoffAt).getTime() <= now)
+      .filter(m => m.status !== 'finished' || m.homeScore == null || m.awayScore == null)
+      .sort((a, b) => new Date(b.kickoffAt) - new Date(a.kickoffAt));
+  }, [matches]);
+
+  // Próximos jogos (kickoff futuro), ascendente, pra caso queira ajustar
+  // antes (raro mas útil).
+  const upcoming = useMemo(() => {
+    const now = Date.now();
+    return matches
+      .filter(m => new Date(m.kickoffAt).getTime() > now)
+      .sort((a, b) => new Date(a.kickoffAt) - new Date(b.kickoffAt));
+  }, [matches]);
+
+  // Já finalizados com placar — geralmente não vai mexer, mas pode ter
+  // que corrigir. Mais recentes primeiro.
+  const done = useMemo(() => {
+    return matches
+      .filter(m => m.status === 'finished' && m.homeScore != null && m.awayScore != null)
+      .sort((a, b) => new Date(b.kickoffAt) - new Date(a.kickoffAt));
+  }, [matches]);
+
+  const STAGE_SHORT = {
+    group: 'Grupo', friendly: 'Amistoso',
+    r32: 'R32', r16: 'Oitavas', qf: 'QF', sf: 'Semi', third: '3º', final: 'Final'
+  };
+
+  const formatLabel = (m) => {
+    const h = teamsByCode[m.homeTeam]?.code || m.homePlaceholder || '?';
+    const a = teamsByCode[m.awayTeam]?.code || m.awayPlaceholder || '?';
+    const dt = new Date(m.kickoffAt);
+    const day = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const time = dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const stagePart = STAGE_SHORT[m.stage] + (m.group ? ` ${m.group}` : '');
+    const scorePart = (m.homeScore != null && m.awayScore != null)
+      ? `${m.homeScore}-${m.awayScore}`
+      : '—';
+    return `${day} ${time} · ${stagePart} · ${h} ${scorePart} ${a}`;
+  };
+
+  // Pré-seleciona o primeiro que precisa atenção; se não tiver, o próximo
+  // agendado; se ainda não, o primeiro da lista completa.
+  const initialId = needsAttention[0]?.id || upcoming[0]?.id || matches[0]?.id || '';
+  const [matchId, setMatchId] = useState(initialId);
   const match = matches.find(m => m.id === matchId);
   const [home, setHome] = useState(match?.homeScore ?? 0);
   const [away, setAway] = useState(match?.awayScore ?? 0);
@@ -315,14 +368,55 @@ function MatchOverride({ matches, teamsByCode, onSave }) {
 
   return (
     <Card>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-2)', gap: 'var(--sp-3)', flexWrap: 'wrap' }}>
+        <p className="muted" style={{ margin: 0, fontSize: 'var(--fs-small)' }}>
+          {needsAttention.length > 0
+            ? <><strong>{needsAttention.length}</strong> jogo{needsAttention.length === 1 ? '' : 's'} precisa{needsAttention.length === 1 ? '' : 'm'} de placar</>
+            : 'Todos os jogos com kickoff passado já têm placar.'}
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowAll(s => !s)}
+          style={{
+            background: 'transparent',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--r-pill)',
+            padding: '4px var(--sp-3)',
+            fontSize: 'var(--fs-tiny)',
+            fontFamily: 'var(--font-body)',
+            fontWeight: 'var(--fw-semibold)',
+            color: 'var(--text-muted)',
+            cursor: 'pointer'
+          }}
+        >
+          {showAll ? 'Só os pendentes' : 'Ver todos os 104'}
+        </button>
+      </div>
+
       <label className="pred-field">
         <span>Jogo</span>
         <select value={matchId} onChange={(e) => pickMatch(e.target.value)}>
-          {matches.map(m => {
-            const h = teamsByCode[m.homeTeam]?.name || m.homePlaceholder || '?';
-            const a = teamsByCode[m.awayTeam]?.name || m.awayPlaceholder || '?';
-            return <option key={m.id} value={m.id}>{m.id} · {h} vs {a}</option>;
-          })}
+          {needsAttention.length > 0 && (
+            <optgroup label={`⚠ Precisam de placar (${needsAttention.length})`}>
+              {needsAttention.map(m => (
+                <option key={m.id} value={m.id}>{formatLabel(m)}</option>
+              ))}
+            </optgroup>
+          )}
+          {showAll && upcoming.length > 0 && (
+            <optgroup label={`Próximos jogos (${upcoming.length})`}>
+              {upcoming.map(m => (
+                <option key={m.id} value={m.id}>{formatLabel(m)}</option>
+              ))}
+            </optgroup>
+          )}
+          {showAll && done.length > 0 && (
+            <optgroup label={`✓ Já com placar (${done.length})`}>
+              {done.map(m => (
+                <option key={m.id} value={m.id}>{formatLabel(m)}</option>
+              ))}
+            </optgroup>
+          )}
         </select>
       </label>
 
