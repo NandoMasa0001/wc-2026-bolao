@@ -46,7 +46,8 @@ export default function PredictionsPage() {
     matches, groupMatches, predictionsByMatchForMe,
     advancementPredictions, finalsPredictions, awardPredictions, pollPredictions,
     extraPredictions, teamBoosts,
-    me, config, saveFinalists, saveAwards, savePollPrediction, saveExtras
+    me, config, tournamentLocked,
+    saveFinalists, saveAwards, savePollPrediction, saveExtras
   } = useData();
   const { show } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -117,6 +118,21 @@ export default function PredictionsPage() {
         onGo={goToSection}
       />
 
+      {tournamentLocked && (
+        <div role="alert" style={{
+          background: 'var(--c-orange-soft, rgba(247, 149, 22, 0.14))',
+          border: '1px solid var(--c-orange)',
+          color: 'var(--text-primary)',
+          padding: 'var(--sp-3)',
+          borderRadius: 'var(--r-md)',
+          marginBottom: 'var(--sp-3)',
+          fontSize: 'var(--fs-small)',
+          textAlign: 'center'
+        }}>
+          🔒 <strong>Mundial começou — palpites longos travados.</strong> A classificação, finalistas, prêmios, zebra e apostas extras estão congelados desde o apito inicial. Você ainda consegue ver tudo, mas não dá pra editar.
+        </div>
+      )}
+
       <div className="pred-tabs" role="group" aria-label="Seções de palpites">
         {TABS.map(({ key, label }) => (
           <button
@@ -145,14 +161,27 @@ export default function PredictionsPage() {
         <EspeciaisTab
           teams={teams}
           teamBoosts={teamBoosts}
+          locked={tournamentLocked}
           finalsCurrent={me ? finalsPredictions[me.id] : null}
           awardsCurrent={me ? awardPredictions[me.id] : null}
           pollCurrent={me ? pollPredictions[me.id] : null}
           extrasCurrent={me ? extraPredictions[me.id] : null}
-          onSaveFinalists={(arr) => { saveFinalists(arr); show('Finalistas salvos', { variant: 'success' }); }}
-          onSaveAwards={(vals) => { saveAwards(vals); show('Prêmios salvos', { variant: 'success' }); }}
-          onSavePoll={(vals) => { savePollPrediction(vals); show('Zebra salva', { variant: 'success' }); }}
-          onSaveExtras={(vals) => { saveExtras(vals); show('Extras salvos', { variant: 'success' }); }}
+          onSaveFinalists={(arr) => {
+            if (tournamentLocked) { show('Trava do mundial — palpites longos congelados', { variant: 'danger' }); return; }
+            saveFinalists(arr); show('Finalistas salvos', { variant: 'success' });
+          }}
+          onSaveAwards={(vals) => {
+            if (tournamentLocked) { show('Trava do mundial — palpites longos congelados', { variant: 'danger' }); return; }
+            saveAwards(vals); show('Prêmios salvos', { variant: 'success' });
+          }}
+          onSavePoll={(vals) => {
+            if (tournamentLocked) { show('Trava do mundial — palpites longos congelados', { variant: 'danger' }); return; }
+            savePollPrediction(vals); show('Zebra salva', { variant: 'success' });
+          }}
+          onSaveExtras={(vals) => {
+            if (tournamentLocked) { show('Trava do mundial — palpites longos congelados', { variant: 'danger' }); return; }
+            saveExtras(vals); show('Extras salvos', { variant: 'success' });
+          }}
         />
       )}
     </>
@@ -472,7 +501,7 @@ function BracketCenter({ final, third, teamsByCode }) {
 /* ====================================================================== */
 
 function EspeciaisTab({
-  teams, teamBoosts,
+  teams, teamBoosts, locked = false,
   finalsCurrent, awardsCurrent, pollCurrent, extrasCurrent,
   onSaveFinalists, onSaveAwards, onSavePoll, onSaveExtras
 }) {
@@ -504,6 +533,7 @@ function EspeciaisTab({
         teams={teams}
         teamBoosts={teamBoosts}
         current={extrasCurrent}
+        locked={locked}
         onSave={(champion) => onSaveExtras({ champion })}
       />
 
@@ -511,21 +541,22 @@ function EspeciaisTab({
         teams={teams}
         current={finalsCurrent}
         teamBoosts={teamBoosts}
+        locked={locked}
         onSave={onSaveFinalists}
       />
 
-      <AwardsTab current={awardsCurrent} onSave={onSaveAwards} />
+      <AwardsTab current={awardsCurrent} locked={locked} onSave={onSaveAwards} />
 
-      <PollTab teams={teams} current={pollCurrent} onSave={onSavePoll} />
+      <PollTab teams={teams} current={pollCurrent} locked={locked} onSave={onSavePoll} />
 
-      <NumericasSection current={extrasCurrent} onSave={onSaveExtras} />
+      <NumericasSection current={extrasCurrent} locked={locked} onSave={onSaveExtras} />
 
-      <QuemMarcaSection current={extrasCurrent} onSave={onSaveExtras} />
+      <QuemMarcaSection current={extrasCurrent} locked={locked} onSave={onSaveExtras} />
     </div>
   );
 }
 
-function CampeaoSection({ teams, teamBoosts, current, onSave }) {
+function CampeaoSection({ teams, teamBoosts, current, locked = false, onSave }) {
   const [champion, setChampion] = useState(current?.champion || '');
   const sortedTeams = useMemo(() => {
     return [...teams].sort((a, b) => {
@@ -562,15 +593,15 @@ function CampeaoSection({ teams, teamBoosts, current, onSave }) {
         </p>
       )}
       <div className="pred-confirm__row">
-        <Button variant="primary" onClick={() => onSave(champion || null)} disabled={!champion}>
-          Salvar campeão
+        <Button variant="primary" onClick={() => onSave(champion || null)} disabled={!champion || locked}>
+          {locked ? '🔒 Travado' : 'Salvar campeão'}
         </Button>
       </div>
     </Card>
   );
 }
 
-function NumericasSection({ current, onSave }) {
+function NumericasSection({ current, locked = false, onSave }) {
   const [vals, setVals] = useState({
     totalGoalsWC:   current?.totalGoalsWC   ?? '',
     neymarGA:       current?.neymarGA       ?? '',
@@ -605,13 +636,13 @@ function NumericasSection({ current, onSave }) {
         <input type="text" inputMode="numeric" value={vals.topScorerGoals} onChange={updateNum('topScorerGoals')} placeholder="ex: 8" />
       </label>
       <div className="pred-confirm__row">
-        <Button variant="primary" onClick={handleSave}>Salvar numéricas</Button>
+        <Button variant="primary" onClick={handleSave} disabled={locked}>{locked ? '🔒 Travado' : 'Salvar numéricas'}</Button>
       </div>
     </Card>
   );
 }
 
-function QuemMarcaSection({ current, onSave }) {
+function QuemMarcaSection({ current, locked = false, onSave }) {
   const [vals, setVals] = useState({
     firstGoalBrazil: current?.firstGoalBrazil || '',
     lastGoalBrazil:  current?.lastGoalBrazil  || '',
@@ -641,7 +672,7 @@ function QuemMarcaSection({ current, onSave }) {
         <input type="text" value={vals.hundredthGoal} onChange={update('hundredthGoal')} placeholder="quem marca?" />
       </label>
       <div className="pred-confirm__row">
-        <Button variant="primary" onClick={handleSave}>Salvar quem marca</Button>
+        <Button variant="primary" onClick={handleSave} disabled={locked}>{locked ? '🔒 Travado' : 'Salvar quem marca'}</Button>
       </div>
     </Card>
   );
@@ -649,7 +680,7 @@ function QuemMarcaSection({ current, onSave }) {
 
 const FINALISTS_TOP_N = 12;
 
-function FinalistsTab({ teams, current, teamBoosts = {}, onSave }) {
+function FinalistsTab({ teams, current, teamBoosts = {}, locked = false, onSave }) {
   const [picks, setPicks] = useState(current?.finalists || []);
   const [showAll, setShowAll] = useState(false);
 
@@ -731,9 +762,9 @@ function FinalistsTab({ teams, current, teamBoosts = {}, onSave }) {
         <Button
           variant="primary"
           onClick={() => onSave(picks)}
-          disabled={picks.length !== 2}
+          disabled={picks.length !== 2 || locked}
         >
-          Salvar finalistas
+          {locked ? '🔒 Travado' : 'Salvar finalistas'}
         </Button>
       </div>
     </Card>
@@ -744,7 +775,7 @@ function FinalistsTab({ teams, current, teamBoosts = {}, onSave }) {
 /* Awards                                                                 */
 /* ====================================================================== */
 
-function AwardsTab({ current, onSave }) {
+function AwardsTab({ current, locked = false, onSave }) {
   const [vals, setVals] = useState({
     bestPlayer:  current?.bestPlayer  || '',
     youngPlayer: current?.youngPlayer || '',
@@ -803,9 +834,9 @@ function AwardsTab({ current, onSave }) {
         <Button
           variant="primary"
           onClick={() => onSave(vals)}
-          disabled={!anyFilled}
+          disabled={!anyFilled || locked}
         >
-          Salvar prêmios
+          {locked ? '🔒 Travado' : 'Salvar prêmios'}
         </Button>
       </div>
     </Card>
@@ -816,7 +847,7 @@ function AwardsTab({ current, onSave }) {
 /* Dark horse / disappointment poll predictions                           */
 /* ====================================================================== */
 
-function PollTab({ teams, current, onSave }) {
+function PollTab({ teams, current, locked = false, onSave }) {
   const [darkHorse, setDarkHorse] = useState(current?.darkHorse || '');
   const [disappointment, setDisappointment] = useState(current?.disappointment || '');
 
@@ -847,9 +878,9 @@ function PollTab({ teams, current, onSave }) {
         <Button
           variant="primary"
           onClick={() => onSave({ darkHorse, disappointment })}
-          disabled={!darkHorse && !disappointment}
+          disabled={(!darkHorse && !disappointment) || locked}
         >
-          Salvar
+          {locked ? '🔒 Travado' : 'Salvar'}
         </Button>
       </div>
     </Card>

@@ -649,6 +649,13 @@ function SupabaseDataProvider({ children }) {
   // freeze every saver. The hard lock is still the RLS check against
   // tournament_starts_at; this one stops in-app before hitting Postgres.
   const paused = config?.predictionsOpen === false;
+  // Tournament-long predictions also lock at the apito inicial — once
+  // tournament_starts_at is in the past, the DB-side RLS rejects writes
+  // (silently from the user's POV). Mirror that on the client so the
+  // UI can disable buttons and stop showing fake "Salvo" toasts.
+  const tournamentLocked = !!config?.tournamentStartsAt &&
+    new Date(config.tournamentStartsAt).getTime() <= Date.now();
+  const longLocked = paused || tournamentLocked;
 
   const savePrediction = useCallback(async (matchId, { homeScore, awayScore, advancer }) => {
     if (!session) return;
@@ -716,7 +723,7 @@ function SupabaseDataProvider({ children }) {
 
   const confirmAdvancement = useCallback(async (teamsArr) => {
     if (!session) return;
-    if (paused) { console.warn('confirmAdvancement blocked — predictions paused'); return; }
+    if (longLocked) { console.warn('confirmAdvancement blocked — tournament locked'); return; }
     const { error } = await supabase
       .from('advancement_predictions')
       .upsert({
@@ -726,21 +733,21 @@ function SupabaseDataProvider({ children }) {
         points: 0
       }, { onConflict: 'player_id' });
     if (error) console.error('confirmAdvancement', error);
-  }, [session, paused]);
+  }, [session, longLocked]);
 
   const saveFinalists = useCallback(async (finalists) => {
     if (!session) return;
-    if (paused) { console.warn('saveFinalists blocked — predictions paused'); return; }
+    if (longLocked) { console.warn('saveFinalists blocked — tournament locked'); return; }
     const { error } = await supabase
       .from('finals_predictions')
       .upsert({ player_id: session.id, finalists, points: 0 },
               { onConflict: 'player_id' });
     if (error) console.error('saveFinalists', error);
-  }, [session, paused]);
+  }, [session, longLocked]);
 
   const saveAwards = useCallback(async ({ bestPlayer, youngPlayer, goalkeeper, topScorer }) => {
     if (!session) return;
-    if (paused) { console.warn('saveAwards blocked — predictions paused'); return; }
+    if (longLocked) { console.warn('saveAwards blocked — tournament locked'); return; }
     const { error } = await supabase
       .from('award_predictions')
       .upsert({
@@ -752,11 +759,11 @@ function SupabaseDataProvider({ children }) {
         points: 0
       }, { onConflict: 'player_id' });
     if (error) console.error('saveAwards', error);
-  }, [session, paused]);
+  }, [session, longLocked]);
 
   const savePollPrediction = useCallback(async ({ darkHorse, disappointment }) => {
     if (!session) return;
-    if (paused) { console.warn('savePollPrediction blocked — predictions paused'); return; }
+    if (longLocked) { console.warn('savePollPrediction blocked — tournament locked'); return; }
     const { error } = await supabase
       .from('poll_predictions')
       .upsert({
@@ -766,11 +773,11 @@ function SupabaseDataProvider({ children }) {
         points: 0
       }, { onConflict: 'player_id' });
     if (error) console.error('savePollPrediction', error);
-  }, [session, paused]);
+  }, [session, longLocked]);
 
   const saveExtras = useCallback(async (extras) => {
     if (!session) return;
-    if (paused) { console.warn('saveExtras blocked — predictions paused'); return; }
+    if (longLocked) { console.warn('saveExtras blocked — tournament locked'); return; }
     // Partial update: only override fields that are explicitly present in
     // `extras`. Fields not passed get preserved from the existing row.
     const numOrNull = (v) => (v === '' || v == null ? null : Number(v));
@@ -805,7 +812,7 @@ function SupabaseDataProvider({ children }) {
       .from('extra_predictions')
       .upsert(merged, { onConflict: 'player_id' });
     if (error) console.error('saveExtras', error);
-  }, [session]);
+  }, [session, longLocked]);
 
   // Audit log writer. Best-effort: if the admin_actions table isn't
   // available on this league yet (pre-0008 migration), we silently fail
@@ -878,6 +885,7 @@ function SupabaseDataProvider({ children }) {
       teamBoosts,
       me, loading,
       adminActions, logAdminAction,
+      tournamentLocked,
       savePrediction, saveMatchResult, confirmAdvancement, saveFinalists,
       saveAwards, savePollPrediction, saveExtras, updateConfig, updateConfigResults,
       deletePlayer, recomputeAllScores
@@ -891,6 +899,7 @@ function SupabaseDataProvider({ children }) {
       teamBoosts,
       me, loading,
       adminActions, logAdminAction,
+      tournamentLocked,
       savePrediction, saveMatchResult, confirmAdvancement, saveFinalists,
       saveAwards, savePollPrediction, saveExtras, updateConfig, updateConfigResults,
       deletePlayer, recomputeAllScores
