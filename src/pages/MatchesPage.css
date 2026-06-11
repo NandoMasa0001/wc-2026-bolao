@@ -271,3 +271,83 @@
   from { transform: translateY(100%); opacity: 0; }
   to   { transform: translateY(0); opacity: 1; }
 }
+
+/* ===== Contador de gols (até o 100º) ===== */
+.goal-counter {
+  background: linear-gradient(135deg, var(--c-blue-soft) 0%, var(--c-lime-soft) 100%);
+  border: 1px solid rgba(0, 73, 144, 0.18);
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-3);
+  box-shadow: var(--shadow-1);
+}
+
+.goal-counter__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--sp-2);
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.goal-counter__label {
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.goal-counter__count {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.goal-counter__count strong {
+  font-size: var(--fs-display);
+  font-weight: var(--fw-black);
+  color: var(--c-blue);
+}
+
+.goal-counter__sep {
+  font-size: var(--fs-h2);
+  color: var(--text-muted);
+  margin: 0 4px;
+}
+
+.goal-counter__max {
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-bold);
+  color: var(--text-muted);
+}
+
+.goal-counter__bar {
+  height: 8px;
+  background: rgba(0, 73, 144, 0.12);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  margin-bottom: var(--sp-2);
+}
+
+.goal-counter__bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--c-blue) 0%, var(--c-lime) 100%);
+  border-radius: var(--r-pill);
+  transition: width var(--dur-normal) var(--ease);
+}
+
+.goal-counter__hint {
+  font-size: var(--fs-small);
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.goal-counter__hint strong {
+  color: var(--c-orange);
+  font-weight: var(--fw-bold);
+}

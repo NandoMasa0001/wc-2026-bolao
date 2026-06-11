@@ -145,6 +145,20 @@ export default function MatchesPage() {
     show(`${saved} palpite${saved === 1 ? '' : 's'} salvo${saved === 1 ? '' : 's'}`, { variant: 'success' });
   };
 
+  // Total de gols na Copa até agora — soma placares finais + parciais.
+  // Esconde depois que passar de 100 (já saiu, ninguém mais precisa
+  // do contador).
+  const totalGoals = useMemo(() => {
+    let g = 0;
+    for (const m of matches) {
+      if (m.stage !== 'group' && m.stage !== 'r32' && m.stage !== 'r16' &&
+          m.stage !== 'qf' && m.stage !== 'sf' && m.stage !== 'third' && m.stage !== 'final') continue;
+      if (m.homeScore != null) g += m.homeScore;
+      if (m.awayScore != null) g += m.awayScore;
+    }
+    return g;
+  }, [matches]);
+
   return (
     <>
       <div className="matches-header">
@@ -153,6 +167,10 @@ export default function MatchesPage() {
           Ver consenso →
         </Link>
       </div>
+
+      {totalGoals > 0 && totalGoals < 100 && (
+        <GoalCounter total={totalGoals} />
+      )}
 
       <SpecialsBanner
         me={me}
@@ -360,5 +378,37 @@ function PendingNudge({
       </span>
       <span className="pending-nudge__arrow" aria-hidden="true">→</span>
     </Link>
+  );
+}
+
+/**
+ * Progresso "rumo ao gol 100 da Copa" — barra + contador visíveis no topo
+ * da home. Some quando o gol 100 já foi marcado (aposta resolvida) ou
+ * antes de qualquer gol sair.
+ */
+function GoalCounter({ total }) {
+  const pct = Math.min(100, (total / 100) * 100);
+  const remaining = 100 - total;
+  return (
+    <div className="goal-counter" role="region" aria-label="Contagem de gols na Copa">
+      <div className="goal-counter__top">
+        <span className="goal-counter__label">⚽ Gols na Copa</span>
+        <span className="goal-counter__count">
+          <strong>{total}</strong>
+          <span className="goal-counter__sep">/</span>
+          <span className="goal-counter__max">100</span>
+        </span>
+      </div>
+      <div className="goal-counter__bar" aria-hidden="true">
+        <div className="goal-counter__bar-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="goal-counter__hint">
+        {remaining === 1
+          ? <>Próximo gol é o 100º — quem palpitou tá no fio da navalha.</>
+          : remaining <= 10
+          ? <>Faltam <strong>{remaining}</strong> gols pro 100º.</>
+          : <>Faltam {remaining} gols pro 100º.</>}
+      </div>
+    </div>
   );
 }
