@@ -551,8 +551,8 @@ function Preflight({ config, teams, matches, players }) {
         : 'falta config'
     },
     {
-      label: 'Cron de resultados ativo (< 30 min)',
-      status: cronAgeMin == null ? 'warn' : cronAgeMin <= 30 ? 'ok' : cronAgeMin <= 120 ? 'warn' : 'bad',
+      label: 'Cron de resultados ativo (< 60 min)',
+      status: cronAgeMin == null ? 'warn' : cronAgeMin <= 60 ? 'ok' : cronAgeMin <= 180 ? 'warn' : 'bad',
       detail: cronAgeMin == null ? 'nunca rodou (ou migration 0008 pendente)' :
               cronAgeMin < 60 ? `${cronAgeMin} min atrás` :
               `${Math.round(cronAgeMin / 60)} h atrás`
