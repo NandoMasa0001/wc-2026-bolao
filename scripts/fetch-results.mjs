@@ -296,7 +296,9 @@ async function runForLeague({ league, apiMatches, championOdds, primaryResults, 
     agg.predictionsMade += 1;
     if (match.status === 'finished') {
       agg.matches += points;
-      if (baseMatchPoints(predObj, actualForScoring) === 7) agg.exactScores += 1;
+      // Cravada (placar exato) hoje vale 8. Era 7 antes do rework
+      // de scoring — esse contador alimenta o tiebreaker no leaderboard.
+      if (baseMatchPoints(predObj, actualForScoring) === 8) agg.exactScores += 1;
     }
   }
 
