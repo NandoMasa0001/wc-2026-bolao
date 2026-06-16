@@ -117,13 +117,22 @@ export async function fetchMatches({ apiKey, competition = 'WC', teamsByApiId = 
   return out;
 }
 
+// Some country codes that the football-data API returns differ from what
+// we seeded into our teams table (we used ISO 3166-1 alpha-3 for a few,
+// the API uses FIFA TLAs). Map API → DB to avoid FK violations when the
+// API populates R32+ slots after groups end.
+const API_CODE_FIXUPS = {
+  URU: 'URY' // Uruguay: API says URU, we have URY
+};
+
 function lookupCode(apiTeam, teamsByApiId) {
   if (!apiTeam || apiTeam.id == null) return null;
-  return teamsByApiId[apiTeam.id]?.code
+  const raw = teamsByApiId[apiTeam.id]?.code
     || apiTeam.tla
     || apiTeam.shortName?.slice(0, 3).toUpperCase()
     || apiTeam.name?.slice(0, 3).toUpperCase()
     || null;
+  return raw && API_CODE_FIXUPS[raw] ? API_CODE_FIXUPS[raw] : raw;
 }
 
 /**

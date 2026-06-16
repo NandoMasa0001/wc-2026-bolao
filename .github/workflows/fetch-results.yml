@@ -2,7 +2,11 @@ name: fetch-results
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # GH Actions throttles heavily on busy days; ask for 5 min, accept 15-30
+    # Two interleaved schedules to maximise our chances of winning a runner
+    # slot on busy days. GH Actions throttles aggressively (free tier sees
+    # 30 min – 5 h gaps even with */5), so we ask twice as often.
+    - cron: '*/5 * * * *'
+    - cron: '2-59/5 * * * *'
   workflow_dispatch:
 
 concurrency:
