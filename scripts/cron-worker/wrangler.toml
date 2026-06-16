@@ -1,0 +1,8 @@
+name = "bolao-fetch-cron"
+main = "worker.js"
+compatibility_date = "2026-05-25"
+
+# Dispara o GitHub Actions workflow_dispatch a cada 15 minutos.
+# CF Workers cron triggers não são throttled como o do GH Actions.
+[triggers]
+crons = ["*/15 * * * *"]
