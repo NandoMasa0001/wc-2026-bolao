@@ -362,7 +362,7 @@ function AdvancementTab({ groupMatches, allMatches, teamsByCode, teamsByGroup, p
       <Card id="sec-advancement">
         <h3 className="pred-section-title">Seleções que você acha que vão se classificar ({advancingArr.length})</h3>
         <p className="muted">
-          Cada acerto vale <strong>5 pts</strong>. Pontuação flat — sem multiplicador. Atualiza automaticamente quando você muda placares em <strong>Jogos</strong>.
+          Cada acerto vale <strong>4 pts</strong>. Pontuação flat — sem multiplicador. Atualiza automaticamente quando você muda placares em <strong>Jogos</strong>.
         </p>
         <div className="pred-advancement__grid">
           {advancingArr.map((code) => (
@@ -574,7 +574,7 @@ function CampeaoSection({ teams, teamBoosts, current, locked = false, onSave }) 
     <Card id="sec-campeao">
       <h3 className="pred-section-title">O campeão</h3>
       <p className="muted">
-        A seleção que levanta a taça. <strong>30 pts × multiplicador da seleção</strong> (favoritos = 1×, zebras até 2.5×). Independente de quem é finalista.
+        A seleção que levanta a taça. <strong>21 pts × multiplicador da seleção</strong> (favoritos = 1×, zebras até 2.5×). Independente de quem é finalista.
       </p>
       <label className="pred-field">
         <span>Campeão da Copa</span>
@@ -624,15 +624,15 @@ function NumericasSection({ current, locked = false, onSave }) {
         Só o <strong>total de gols</strong> usa proximidade (−5 pts por gol errado, mínimo 0). G+A do Neymar e gols do artilheiro são tudo-ou-nada: cravou ganha tudo, errou ganha 0.
       </p>
       <label className="pred-field">
-        <span>Total de gols na Copa (60 pts — proximidade)</span>
+        <span>Total de gols na Copa (42 pts — proximidade)</span>
         <input type="text" inputMode="numeric" value={vals.totalGoalsWC} onChange={updateNum('totalGoalsWC')} placeholder="ex: 172" />
       </label>
       <label className="pred-field">
-        <span>Gols + assistências do Neymar (30 pts — cravada)</span>
+        <span>Gols + assistências do Neymar (21 pts — cravada)</span>
         <input type="text" inputMode="numeric" value={vals.neymarGA} onChange={updateNum('neymarGA')} placeholder="ex: 5" />
       </label>
       <label className="pred-field">
-        <span>Nº de gols do artilheiro da copa (20 pts — cravada)</span>
+        <span>Nº de gols do artilheiro da copa (14 pts — cravada)</span>
         <input type="text" inputMode="numeric" value={vals.topScorerGoals} onChange={updateNum('topScorerGoals')} placeholder="ex: 8" />
       </label>
       <div className="pred-confirm__row">
@@ -660,15 +660,15 @@ function QuemMarcaSection({ current, locked = false, onSave }) {
       <h3 className="pred-section-title">Quem marca o gol</h3>
       <p className="muted">Texto livre — tem que bater exato com o nome do jogador.</p>
       <label className="pred-field">
-        <span>Primeiro gol do Brasil na copa (25 pts)</span>
+        <span>Primeiro gol do Brasil na copa (18 pts)</span>
         <input type="text" value={vals.firstGoalBrazil} onChange={update('firstGoalBrazil')} placeholder="ex: Vinícius Jr." />
       </label>
       <label className="pred-field">
-        <span>Último gol do Brasil na copa (25 pts)</span>
+        <span>Último gol do Brasil na copa (18 pts)</span>
         <input type="text" value={vals.lastGoalBrazil} onChange={update('lastGoalBrazil')} placeholder="ex: Rodrygo" />
       </label>
       <label className="pred-field">
-        <span>100º gol da copa (50 pts)</span>
+        <span>100º gol da copa (35 pts)</span>
         <input type="text" value={vals.hundredthGoal} onChange={update('hundredthGoal')} placeholder="quem marca?" />
       </label>
       <div className="pred-confirm__row">
@@ -722,7 +722,7 @@ function FinalistsTab({ teams, current, teamBoosts = {}, locked = false, onSave 
     <Card id="sec-finalistas">
       <h3 className="pred-section-title">Escolha os dois finalistas</h3>
       <p className="muted">
-        20 pontos × multiplicador por finalista correto. Usa o mesmo boost do campeão (log-prob das odds atuais) — favorito = 1×, azarão extremo = 2.5×.
+        14 pontos × multiplicador por finalista correto. Usa o mesmo boost do campeão (log-prob das odds atuais) — favorito = 1×, azarão extremo = 2.5×.
       </p>
       <div className="pred-finalists__grid">
         {visibleTeams.map(team => {
@@ -790,7 +790,7 @@ function AwardsTab({ current, locked = false, onSave }) {
     <Card id="sec-premios">
       <h3 className="pred-section-title">Prêmios individuais</h3>
       <p className="muted">
-        Texto livre — tem que bater exato com o nome oficial do vencedor (não diferencia maiúscula/minúscula). 20 pontos cada, máx 80.
+        Texto livre — tem que bater exato com o nome oficial do vencedor (não diferencia maiúscula/minúscula). 14 pontos cada, máx 56.
       </p>
       <div className="pred-awards__grid">
         <label className="pred-field">
@@ -855,7 +855,7 @@ function PollTab({ teams, current, locked = false, onSave }) {
     <Card id="sec-zebra">
       <h3 className="pred-section-title">Zebra & decepção</h3>
       <p className="muted">
-        Feito antes do mundial. Depois da final, os amigos votam — a seleção mais votada vira a resposta oficial. 15 pontos cada.
+        Feito antes do mundial. Depois da final, os amigos votam — a seleção mais votada vira a resposta oficial. 11 pontos cada.
       </p>
 
       <label className="pred-field">

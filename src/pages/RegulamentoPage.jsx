@@ -114,17 +114,17 @@ export default function RegulamentoPage() {
       <Card className="reg-card">
         <h3 className="reg-h">3. Palpites longos do torneio</h3>
         <div className="reg-section">
-          <h4 className="reg-h4">3.1. Classificação <span className="muted">— 5 pts por seleção que realmente passar (sem multiplicador)</span></h4>
+          <h4 className="reg-h4">3.1. Classificação <span className="muted">— 4 pts por seleção que realmente passar (sem multiplicador)</span></h4>
           <p>
             Você palpita o placar dos 72 jogos da fase de grupos; o sistema deriva automaticamente quem classifica (16 primeiros lugares + 16 segundos + 8 melhores terceiros = 32 seleções).
-            Não tem botão de "confirmar" — a sua lista de 32 atualiza sozinha toda vez que você muda um placar em Jogos. Cada acerto vale <strong>5 pontos flat</strong> — sem boost por seleção (volume de 32 picks já dá peso suficiente).
+            Não tem botão de "confirmar" — a sua lista de 32 atualiza sozinha toda vez que você muda um placar em Jogos. Cada acerto vale <strong>4 pontos flat</strong> — sem boost por seleção (volume de 32 picks já dá peso suficiente).
             <br />
-            <strong>Máximo possível:</strong> 160 pts (acertando os 32).
+            <strong>Máximo possível:</strong> 128 pts (acertando os 32).
           </p>
         </div>
 
         <div className="reg-section">
-          <h4 className="reg-h4">3.2. Finalistas <span className="muted">— 20 pts × multiplicador, por finalista correto</span></h4>
+          <h4 className="reg-h4">3.2. Finalistas <span className="muted">— 14 pts × multiplicador, por finalista correto</span></h4>
           <p>
             Você escolhe duas seleções; ordem não importa. Usa o <strong>mesmo multiplicador do campeão</strong> (log-prob das odds atuais — ver §4), pra que a diferença entre favoritos siga as odds reais.
             Favorito = <strong>1×</strong>, azarão extremo = <strong>2.5×</strong>.
@@ -134,7 +134,7 @@ export default function RegulamentoPage() {
         </div>
 
         <div className="reg-section">
-          <h4 className="reg-h4">3.3. Prêmios individuais <span className="muted">— 20 pts cada (sem multiplicador)</span></h4>
+          <h4 className="reg-h4">3.3. Prêmios individuais <span className="muted">— 14 pts cada (sem multiplicador)</span></h4>
           <ul className="reg-ul">
             <li><strong>Bola de Ouro</strong> (melhor jogador da copa)</li>
             <li><strong>Melhor jogador jovem</strong></li>
@@ -145,10 +145,10 @@ export default function RegulamentoPage() {
         </div>
 
         <div className="reg-section">
-          <h4 className="reg-h4">3.4. Zebra & decepção <span className="muted">— 15 pts cada (sem multiplicador)</span></h4>
+          <h4 className="reg-h4">3.4. Zebra & decepção <span className="muted">— 11 pts cada (sem multiplicador)</span></h4>
           <p>
             Feito <em>antes</em> do mundial: você palpita qual seleção será a "zebra" (surpresa positiva) e qual será a "decepção" (esperava muito, foi mal).
-            Depois da final, os amigos votam e a seleção mais votada vira a resposta oficial. Máximo: 30 pts.
+            Depois da final, os amigos votam e a seleção mais votada vira a resposta oficial. Máximo: 22 pts.
           </p>
         </div>
       </Card>
@@ -199,7 +199,7 @@ export default function RegulamentoPage() {
 
         <p className="muted reg-foot">
           <strong>Aplica em:</strong> finalistas, e no palpite de campeão das Extras. <br />
-          <strong>NÃO aplica em:</strong> jogos individuais (placar), classificação (5 pts flat por acerto), prêmios individuais, zebra/decepção, e nas outras apostas extras. <br />
+          <strong>NÃO aplica em:</strong> jogos individuais (placar), classificação (4 pts flat por acerto), prêmios individuais, zebra/decepção, e nas outras apostas extras. <br />
           <strong>Trava em:</strong> {tournamentStartsAt ? tournamentStartsAt.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '11 de junho de 2026'} — depois disso o snapshot fica fixo até o fim da copa.
         </p>
       </Card>
@@ -218,18 +218,18 @@ export default function RegulamentoPage() {
               </tr>
             </thead>
             <tbody>
-              <tr><td>O campeão</td><td>Seleção</td><td className="ta-c">30 × multiplicador</td></tr>
-              <tr><td>Total de gols na copa</td><td>Número</td><td className="ta-c">60 exato, −5 por gol off</td></tr>
-              <tr><td>G+A do Neymar</td><td>Número</td><td className="ta-c">30 (cravada) ou 0</td></tr>
-              <tr><td>Nº de gols do artilheiro</td><td>Número</td><td className="ta-c">20 (cravada) ou 0</td></tr>
-              <tr><td>Primeiro gol do Brasil</td><td>Jogador (texto)</td><td className="ta-c">25</td></tr>
-              <tr><td>Último gol do Brasil</td><td>Jogador (texto)</td><td className="ta-c">25</td></tr>
-              <tr><td>100º gol da copa</td><td>Jogador (texto)</td><td className="ta-c">50</td></tr>
+              <tr><td>O campeão</td><td>Seleção</td><td className="ta-c">21 × multiplicador</td></tr>
+              <tr><td>Total de gols na copa</td><td>Número</td><td className="ta-c">42 exato, −4 por gol off</td></tr>
+              <tr><td>G+A do Neymar</td><td>Número</td><td className="ta-c">21 (cravada) ou 0</td></tr>
+              <tr><td>Nº de gols do artilheiro</td><td>Número</td><td className="ta-c">14 (cravada) ou 0</td></tr>
+              <tr><td>Primeiro gol do Brasil</td><td>Jogador (texto)</td><td className="ta-c">18</td></tr>
+              <tr><td>Último gol do Brasil</td><td>Jogador (texto)</td><td className="ta-c">18</td></tr>
+              <tr><td>100º gol da copa</td><td>Jogador (texto)</td><td className="ta-c">35</td></tr>
             </tbody>
           </table>
         </div>
         <p className="muted reg-foot">
-          Só o <strong>total de gols</strong> tem a regra de proximidade (<code>max(0, 60 − 5 × |seu palpite − valor real|)</code>); errar por mais que 12 zera. As outras numéricas (G+A do Neymar, gols do artilheiro) são tudo-ou-nada: cravou o número ganha tudo, errou por qualquer margem ganha zero. Apostas de texto exigem o nome exato (não diferencia maiúscula/minúscula).
+          Só o <strong>total de gols</strong> tem a regra de proximidade (após redução: <code>teto(0.7 × max(0, 60 − 5 × |seu palpite − valor real|))</code> = até 42 pts); errar por mais que 12 zera. As outras numéricas (G+A do Neymar, gols do artilheiro) são tudo-ou-nada: cravou o número ganha tudo, errou por qualquer margem ganha zero. Apostas de texto exigem o nome exato (não diferencia maiúscula/minúscula).
         </p>
       </Card>
 

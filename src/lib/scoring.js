@@ -214,12 +214,20 @@ export function rankBoostsFromChampionOdds(championOdds = {}, cap = BOOST_CAP) {
  * 32) makes this category big enough on its own; multiplying would create
  * runaway scores when someone nails a long-shot heavy bracket.
  */
+// Multiplicador aplicado em cada item dos palpites longos (advancement,
+// finalists, awards, poll, extras). Match points NÃO são afetados — só
+// os longos eram pesados demais e foram reduzidos pra 70% do original.
+// Aplicado per-item com Math.ceil pra UI labels baterem exato com o que
+// o jogador ganha.
+export const SPECIAL_BUCKET_MULTIPLIER = 0.7;
+const reduce = (n) => Math.ceil(n * SPECIAL_BUCKET_MULTIPLIER);
+
 export function scoreAdvancement(predictedTeams = [], actualAdvancing = []) {
   if (!predictedTeams.length || !actualAdvancing.length) return 0;
   const actualSet = new Set(actualAdvancing);
   let total = 0;
   for (const code of predictedTeams) {
-    if (actualSet.has(code)) total += 5;
+    if (actualSet.has(code)) total += reduce(5); // 5 → 4 per correct
   }
   return total;
 }
@@ -236,7 +244,7 @@ export function scoreFinalists(predictedFinalists = [], actualFinalists = [], te
   for (const code of predictedFinalists) {
     if (!actualSet.has(code)) continue;
     const boost = teamBoosts[code] ?? 1;
-    total += Math.ceil(20 * boost);
+    total += reduce(20 * boost); // 20 × boost → 14 × boost (ceil)
   }
   return total;
 }
@@ -251,7 +259,7 @@ export function scoreAwards(predicted = {}, actual = {}) {
   for (const key of ['bestPlayer', 'youngPlayer', 'goalkeeper', 'topScorer']) {
     const p = norm(predicted[key]);
     const a = norm(actual[key]);
-    if (p && a && p === a) points += 20;
+    if (p && a && p === a) points += reduce(20); // 20 → 14
   }
   return points;
 }
@@ -264,10 +272,10 @@ export function scoreAwards(predicted = {}, actual = {}) {
 export function scorePoll(predicted = {}, actual = {}) {
   let points = 0;
   if (predicted.darkHorse && actual.darkHorse && predicted.darkHorse === actual.darkHorse) {
-    points += 15;
+    points += reduce(15); // 15 → 11
   }
   if (predicted.disappointment && actual.disappointment && predicted.disappointment === actual.disappointment) {
-    points += 15;
+    points += reduce(15);
   }
   return points;
 }
@@ -317,31 +325,30 @@ export function scoreBoolean(predicted, actual, points) {
 export function scoreExtras(predicted = {}, actual = {}, teamBoosts = {}) {
   let total = 0;
 
-  // 1. Champion (30 × team boost)
+  // 1. Champion (30 × boost → reduzido pra 21 × boost com Math.ceil)
   if (predicted.champion && actual.champion && predicted.champion === actual.champion) {
     const boost = teamBoosts[predicted.champion] ?? 1;
-    total += Math.ceil(30 * boost);
+    total += reduce(30 * boost);
   }
 
-  // 2. Total goals in WC (60 max, −5 per goal off) — closeness scoring,
-  // because the realistic answer space is large and a 1-goal miss
-  // shouldn't go to zero.
-  total += scoreCloseness(predicted.totalGoalsWC, actual.totalGoalsWC, 60);
+  // 2. Total goals in WC (60 → 42 max) — closeness com -5/gol off mantido,
+  // a curva fica naturalmente mais íngreme proporcional ao novo max.
+  total += reduce(scoreCloseness(predicted.totalGoalsWC, actual.totalGoalsWC, 60));
 
-  // 3. Neymar G+A (30 pts, EXACT only)
-  total += scoreExactNumber(predicted.neymarGA, actual.neymarGA, 30);
+  // 3. Neymar G+A (30 → 21, EXACT)
+  total += reduce(scoreExactNumber(predicted.neymarGA, actual.neymarGA, 30));
 
-  // 4. Top scorer goal count (20 pts, EXACT only)
-  total += scoreExactNumber(predicted.topScorerGoals, actual.topScorerGoals, 20);
+  // 4. Top scorer goal count (20 → 14, EXACT)
+  total += reduce(scoreExactNumber(predicted.topScorerGoals, actual.topScorerGoals, 20));
 
-  // 5. First goal scorer for Brazil (25 pts)
-  total += scoreExactText(predicted.firstGoalBrazil, actual.firstGoalBrazil, 25);
+  // 5. First goal scorer for Brazil (25 → 18)
+  total += reduce(scoreExactText(predicted.firstGoalBrazil, actual.firstGoalBrazil, 25));
 
-  // 6. Last goal scorer for Brazil (25 pts) — same value as first goal
-  total += scoreExactText(predicted.lastGoalBrazil, actual.lastGoalBrazil, 25);
+  // 6. Last goal scorer for Brazil (25 → 18)
+  total += reduce(scoreExactText(predicted.lastGoalBrazil, actual.lastGoalBrazil, 25));
 
-  // 7. 100th goal of the WC (50 pts)
-  total += scoreExactText(predicted.hundredthGoal, actual.hundredthGoal, 50);
+  // 7. 100th goal of the WC (50 → 35)
+  total += reduce(scoreExactText(predicted.hundredthGoal, actual.hundredthGoal, 50));
 
   return total;
 }
