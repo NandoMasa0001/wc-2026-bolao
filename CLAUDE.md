@@ -464,3 +464,57 @@ owner's design intent, regardless of how convenient it would be.
   translated later.
 - Knockout rounds are predicted match-by-match only (no separate full-bracket
   game) — confirmed.
+
+---
+
+## 15. Production fixes & gotchas (learned the hard way — READ before debugging)
+
+> The stack drifted from this doc: the real backend is **Supabase** (Postgres
+> + RLS), not Firebase, and the app is hosted on **Cloudflare Workers static
+> assets**, not Firebase/Netlify. It runs as 3 separate leagues, each its own
+> Supabase project: **trupe** (`.env`), **familia** (`.env.familia`), **scib**
+> (`.env.scib`, retired). `scripts/leagues.config.json` maps them.
+
+### 15.1 The 1000-row read cap (THE big one — "palpites somindo")
+PostgREST caps `.select(...)` at **1000 rows** (for the anon key AND the
+service key). Once a league's `predictions` table passes 1000 rows (104
+matches × ~15 players ≈ up to ~1560), a plain select **silently returns only
+the first 1000** — the newest picks (knockout) never load, so they "disappear"
+from the UI and the cron stops scoring them, *even though they're saved*. This
+is the real cause behind every "salvei e sumiu / não aparece" report; it first
+bit trupe at 1088 rows.
+
+**Always paginate reads of `predictions`** with `.range(from, from+999)` in a
+loop until a short page. Implemented as `fetchAllRows()` in
+`src/context/DataContext.jsx` and `scripts/fetch-results.mjs`, and inline in
+`scripts/backup.mjs`. Any new code that reads a table which can exceed 1000
+rows MUST page the same way. **Do not "fix" this by deleting old predictions —
+the cron recomputes match points from those rows every run, so deleting them
+zeroes everyone's score.**
+
+### 15.2 Deploy reality (`git push` does NOT deploy the app)
+- Frontend = Cloudflare Workers. **trupe is a MANUAL deploy**:
+  `npm run build && npx wrangler deploy` (top-level env). **familia & scib
+  auto-deploy** from `main` via the Cloudflare Git integration.
+- Each league bakes its own `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` at
+  build time. For a manual per-league build use Vite modes
+  (`vite build --mode familia`, with those VITE_ vars in `.env.familia`).
+  Helper: `scripts/deploy.sh [trupe|familia|scib|all]` (has a guard that aborts
+  if the bundle points at the wrong Supabase).
+- The **cron** (`scripts/fetch-results.mjs`) runs from **GitHub Actions** on
+  `main` and scores all leagues — so `git push` *does* ship scoring/cron
+  changes, just not the web app. Verify a deploy by curling the worker URL
+  (`wc-2026-bolao.fernando-masagao.workers.dev`) and checking the
+  `assets/index-*.js` hash changed.
+- **DB migrations** (anything under `supabase/migrations/`) are NOT shipped by
+  git — apply the SQL by hand in **each** league's Supabase SQL editor.
+
+### 15.3 Advancement (classificação) rows can be missing
+The 32 advancing teams live in `advancement_predictions`, auto-derived from a
+player's group scores inside `savePrediction`. Players who finished their group
+picks **before** that auto-derive existed (and never re-saved) have **no row**,
+so the cron scores their advancement as 0. The group stage is locked, so they
+can't trigger it themselves. Fix: re-derive from their stored group predictions
+with `computeStandings`/`predictedMatchesFromPlayer`, upsert the row, and
+recompute `players.points`. Only do this for players who actually have group
+picks — never synthesize a bracket for someone with 0 predictions.
