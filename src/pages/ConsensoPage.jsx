@@ -4,7 +4,8 @@ import Pill from '../components/Pill.jsx';
 import TeamChip from '../components/TeamChip.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { useData } from '../context/DataContext.jsx';
-import { baseMatchPoints } from '../lib/scoring.js';
+import { effectiveBase } from '../lib/scoring.js';
+import { isMatchLocked } from '../lib/locking.js';
 import './ConsensoPage.css';
 
 /**
@@ -36,7 +37,7 @@ function formatKickoff(iso) {
 }
 
 export default function ConsensoPage() {
-  const { matches, teamsByCode, predictions, players } = useData();
+  const { matches, teamsByCode, predictions, players, config } = useData();
   const [filter, setFilter] = useState('all'); // all | finished | live
 
   const playersById = useMemo(() => {
@@ -52,6 +53,10 @@ export default function ConsensoPage() {
     const list = [];
 
     for (const m of matches) {
+      // Privacidade: só mostra o consenso de um jogo depois que ele trava
+      // (apito inicial dele). Antes disso ninguém vê o palpite alheio.
+      if (!isMatchLocked(m, config?.tournamentStartsAt)) continue;
+
       const preds = Object.values(predictions).filter(p => p.matchId === m.id);
       if (preds.length === 0) continue; // hide matches with no picks
 
@@ -68,9 +73,10 @@ export default function ConsensoPage() {
         scoreCounts.set(key, (scoreCounts.get(key) || 0) + 1);
 
         if (m.status === 'finished' && m.homeScore != null && m.awayScore != null) {
-          const base = baseMatchPoints(pr, m);
-          if (base === 8) exactScores.push({ player: playersById[pr.playerId], score: key });
-          else if (base === 5) outcomeHits.push({ player: playersById[pr.playerId], score: key });
+          const exact = pr.homeScore === m.homeScore && pr.awayScore === m.awayScore;
+          const base = effectiveBase(pr, m, m.stage);
+          if (exact) exactScores.push({ player: playersById[pr.playerId], score: key });
+          else if (base >= 4) outcomeHits.push({ player: playersById[pr.playerId], score: key });
         }
       }
 
@@ -100,7 +106,7 @@ export default function ConsensoPage() {
     });
 
     return list;
-  }, [matches, predictions, playersById]);
+  }, [matches, predictions, playersById, config]);
 
   const filtered = useMemo(() => {
     if (filter === 'all') return stats;

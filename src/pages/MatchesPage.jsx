@@ -120,9 +120,16 @@ export default function MatchesPage() {
     return Array.from(map.entries());
   }, [visible]);
 
-  const handleSave = (match) => (pick) => {
-    savePrediction(match.id, pick);
-    show('Palpite salvo', { variant: 'success' });
+  const handleSave = (match) => async (pick) => {
+    // Awaits the real DB result. On failure we surface the error AND
+    // rethrow so the MatchCard keeps the unsaved draft for a retry.
+    try {
+      await savePrediction(match.id, pick);
+      show('Palpite salvo', { variant: 'success' });
+    } catch (err) {
+      show(err?.message || 'Não consegui salvar — tenta de novo.', { variant: 'error' });
+      throw err;
+    }
   };
 
   const draftCount = Object.keys(drafts).length;
@@ -132,17 +139,30 @@ export default function MatchesPage() {
     setBulkSaving(true);
     const entries = Object.entries(drafts);
     let saved = 0;
+    const failed = {};
+    let lastErr = null;
     for (const [matchId, pick] of entries) {
       try {
         await savePrediction(matchId, pick);
         saved += 1;
       } catch (err) {
         console.error('bulk save', matchId, err);
+        failed[matchId] = pick; // keep the draft so nothing is lost
+        lastErr = err;
       }
     }
-    setDrafts({});
+    // Only the failures survive as drafts; saved ones drop out.
+    setDrafts(failed);
     setBulkSaving(false);
-    show(`${saved} palpite${saved === 1 ? '' : 's'} salvo${saved === 1 ? '' : 's'}`, { variant: 'success' });
+    const failCount = Object.keys(failed).length;
+    if (failCount === 0) {
+      show(`${saved} palpite${saved === 1 ? '' : 's'} salvo${saved === 1 ? '' : 's'}`, { variant: 'success' });
+    } else {
+      show(
+        `${saved} salvo${saved === 1 ? '' : 's'}, ${failCount} não salvou — ${lastErr?.message || 'tenta de novo'}`,
+        { variant: 'error' }
+      );
+    }
   };
 
   // Total de gols na Copa até agora — soma placares finais + parciais.

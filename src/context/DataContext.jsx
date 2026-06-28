@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useAuth } from './AuthContext.jsx';
 import { supabase, useMock } from '../supabase.js';
 import { computeStandings, predictedMatchesFromPlayer } from '../lib/standings.js';
+import { isMatchLocked } from '../lib/locking.js';
 import {
   mockConfig,
   mockTeams,
@@ -152,11 +153,12 @@ function MockDataProvider({ children }) {
   }, [players, recomputePlayer]);
 
   const savePrediction = useCallback(async (matchId, { homeScore, awayScore, advancer }) => {
-    if (!session) return;
+    if (!session) throw new Error('Sua sessão expirou. Saia e entre de novo.');
     const match = matches.find(m => m.id === matchId);
-    if (!match) return;
-    const isPastKickoff = new Date(match.kickoffAt).getTime() <= Date.now();
-    if (match.status !== 'scheduled' || isPastKickoff) return;
+    if (!match) throw new Error('Jogo não encontrado — recarrega a página.');
+    if (isMatchLocked(match, config?.tournamentStartsAt)) {
+      throw new Error('Esse jogo já começou — os palpites travaram.');
+    }
 
     const key = `${session.id}_${matchId}`;
     const next = {
@@ -658,20 +660,33 @@ function SupabaseDataProvider({ children }) {
   const longLocked = paused || tournamentLocked;
 
   const savePrediction = useCallback(async (matchId, { homeScore, awayScore, advancer }) => {
-    if (!session) return;
-    if (paused) { console.warn('savePrediction blocked — predictions paused'); return; }
+    // IMPORTANT: this function THROWS on any failure so the UI can show a
+    // real error and keep the unsaved draft. Never swallow errors here —
+    // a silent failure makes the user think a pick saved when it didn't.
+    if (!session) throw new Error('Sua sessão expirou. Saia e entre de novo.');
+    if (paused) throw new Error('Os palpites estão pausados pelo admin.');
     const match = matches.find(m => m.id === matchId);
-    if (!match) return;
+    if (!match) throw new Error('Jogo não encontrado — recarrega a página.');
+    // Trava de horário no relógio local: rejeita palpite depois do apito
+    // inicial mesmo que o cron ainda não tenha mudado o status do jogo.
+    // (O RLS no Supabase é a trava dura no servidor; esta é a primeira
+    // barreira, pra UI não fingir que salvou.)
+    if (isMatchLocked(match, config?.tournamentStartsAt)) {
+      throw new Error('Esse jogo já começou — os palpites travaram.');
+    }
     const payload = {
       player_id: session.id,
       match_id: matchId,
       stage: match.stage,
       home_score: homeScore,
       away_score: awayScore,
+      // Sempre grava o advancer (null quando não é empate) pra limpar
+      // qualquer escolha antiga de "quem passa" ao trocar de empate p/
+      // placar decisivo. Antes só gravava quando != null e deixava resíduo.
+      advancer: advancer ?? null,
       points: 0,
       updated_at: new Date().toISOString()
     };
-    if (advancer != null) payload.advancer = advancer;
 
     // Safety-net: keep a local copy of every save in localStorage. If
     // Supabase has a wobble during a match, the user (or admin) can
@@ -681,10 +696,20 @@ function SupabaseDataProvider({ children }) {
       localStorage.setItem(key, JSON.stringify({ ...payload, savedAt: new Date().toISOString() }));
     } catch { /* private mode / quota — ignore */ }
 
-    const { error } = await supabase
+    // `.select()` makes the write self-verifying: if RLS silently drops it
+    // or the row doesn't come back, we treat it as a failure instead of a
+    // fake success.
+    const { data, error } = await supabase
       .from('predictions')
-      .upsert(payload, { onConflict: 'player_id,match_id' });
-    if (error) { console.error('savePrediction', error); return; }
+      .upsert(payload, { onConflict: 'player_id,match_id' })
+      .select();
+    if (error) {
+      console.error('savePrediction', error);
+      throw new Error('Não consegui salvar (' + (error.message || 'erro de rede') + '). Tenta de novo.');
+    }
+    if (!data || data.length === 0) {
+      throw new Error('O palpite não foi confirmado pelo servidor. Tenta de novo.');
+    }
 
     // Auto-classificação: changing a group placar shifts the standings,
     // so re-derive the 32 advancing teams and upsert advancement_predictions
@@ -709,7 +734,7 @@ function SupabaseDataProvider({ children }) {
         }, { onConflict: 'player_id' });
       if (advErr) console.error('auto-advancement upsert', advErr);
     }
-  }, [session, matches, paused, predictionsByMatchForMe, groupMatches, teamsByGroup]);
+  }, [session, matches, paused, config, predictionsByMatchForMe, groupMatches, teamsByGroup]);
 
   const saveMatchResult = useCallback(async (matchId, { homeScore, awayScore, status }) => {
     if (!me?.isAdmin) return;

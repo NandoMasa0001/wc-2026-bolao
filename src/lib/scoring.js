@@ -90,26 +90,82 @@ export function pickedOutcomeProb(prediction, odds) {
 }
 
 /**
+ * Effective base points (after the knockout advancer/tie adjustments) but
+ * BEFORE any boost or round multiplier. Both the points formula and the UI
+ * labels build on this, so they never disagree.
+ *
+ * Group / friendly matches: plain {8, 5, 0} from `baseMatchPoints`.
+ *
+ * Knockout matches that END IN A DRAW (decided on penalties/extra time —
+ * the score alone no longer says who advanced) use a dedicated matrix:
+ *
+ *   cravou o empate + acertou quem passa → 7
+ *   cravou o empate + errou quem passa   → 6
+ *   errou o placar  + acertou quem passa → 4
+ *   errou o placar  + errou quem passa   → 0
+ *
+ * "Quem passa" (the advancer) is read from `prediction.advancer` when the
+ * player predicted a draw, or from the side they predicted to win when
+ * they predicted a decisive score. The real advancer is `actual.winner`
+ * (set by the cron on shootout results), falling back to the score sign.
+ *
+ * Knockout matches with a DECISIVE result keep the standard 8/5/0, plus
+ * the legacy credit: a player who predicted a draw but named the correct
+ * advancer still gets 5 ("acertou quem passa via pênaltis").
+ */
+export function effectiveBase(prediction, actual, stage) {
+  const base = baseMatchPoints(prediction, actual);
+  if (!prediction || !actual) return base;
+
+  const isKnockout = stage && stage !== 'group' && stage !== 'friendly';
+  if (!isKnockout) return base;
+
+  const ph = prediction.homeScore;
+  const pa = prediction.awayScore;
+  const ah = actual.homeScore;
+  const aa = actual.awayScore;
+  if (ph == null || pa == null || ah == null || aa == null) return base;
+
+  const predictedTie = ph === pa;
+  const actualTie = ah === aa;
+
+  // Who actually advanced — prefer the explicit winner field (set on
+  // penalty-shootout results), then fall back to the score sign.
+  const actualWinner =
+    actual.winner ||
+    (ah > aa ? actual.homeTeam : aa > ah ? actual.awayTeam : null);
+
+  // Who the player expected to advance: their explicit pick on a tie, or
+  // the team they predicted to win on a decisive score.
+  const predictedAdvancer = predictedTie
+    ? (prediction.advancer || null)
+    : (ph > pa ? actual.homeTeam : actual.awayTeam);
+
+  const advancerCorrect = !!actualWinner && predictedAdvancer === actualWinner;
+
+  if (actualTie) {
+    const exactTie = ph === ah && pa === aa;
+    if (exactTie) return advancerCorrect ? 7 : 6;
+    return advancerCorrect ? 4 : 0;
+  }
+
+  // Actual decisive: credit a draw-predictor who named the right team to
+  // go through (0 → 5, same as a normal outcome hit).
+  if (predictedTie && advancerCorrect) return base + 5;
+  return base;
+}
+
+/**
  * Multiplied match points, rounded up.
  *
- *   points = ceil(base × boost × roundMultiplier)
+ *   points = ceil(effectiveBase × boost × roundMultiplier)
  *
  * `options` (optional):
  *   boost: number — pre-computed multiplier. Overrides anything else.
  *   odds:  object — H2H odds; if `boost` not provided, we derive it from
  *                   the player's picked outcome.
  *
- * Knockout advancer rule (only when stage !== 'group'):
- *   - If the player predicted a TIE AND included `prediction.advancer`:
- *       • Actual ended non-tie + advancer correct → base += 5
- *         (upgrades 0 to 5 — "acertou o resultado via penalty pick")
- *       • Actual ended tie (cravou) + advancer wrong → base -= 1
- *         (penalty: cravada would be 8 → 7)
- *   "actual winner" comes from `actual.winner` (set by the cron once the
- *   real result lands) or from the score sign as a fallback.
- *
- * Backward-compatible: callers that don't pass options get boost = 1
- * and the advancer rule only applies when `prediction.advancer` is set.
+ * The knockout tie/advancer logic lives in `effectiveBase` — see there.
  */
 export function matchPoints(
   prediction,
@@ -118,42 +174,7 @@ export function matchPoints(
   multipliers = DEFAULT_ROUND_MULTIPLIERS,
   options = {}
 ) {
-  let base = baseMatchPoints(prediction, actual);
-
-  // Knockout advancer adjustments — only when both prediction and actual
-  // have scores, this is a knockout stage, and the player predicted a tie
-  // with an explicit advancer.
-  const isKnockout = stage && stage !== 'group';
-  if (isKnockout && prediction && actual &&
-      prediction.homeScore != null && prediction.awayScore != null &&
-      actual.homeScore != null && actual.awayScore != null) {
-    const ph = prediction.homeScore;
-    const pa = prediction.awayScore;
-    const ah = actual.homeScore;
-    const aa = actual.awayScore;
-    const predictedTie = ph === pa;
-    const actualTie = ah === aa;
-
-    if (predictedTie && prediction.advancer) {
-      // Who actually advanced — prefer the explicit winner field (set on
-      // penalty-shootout results), then fall back to score comparison.
-      const actualWinner =
-        actual.winner ||
-        (ah > aa ? actual.homeTeam : aa > ah ? actual.awayTeam : null);
-
-      const advancerCorrect = actualWinner && prediction.advancer === actualWinner;
-
-      if (predictedTie && actualTie && base === 8) {
-        // Cravou empate: keep 8 if advancer correct, drop to 7 if wrong.
-        if (actualWinner && !advancerCorrect) base -= 1;
-      } else if (predictedTie && !actualTie) {
-        // Predicted tie, actual non-tie: credit "acertou o resultado" via
-        // the advancer pick (+5 base — same as a normal outcome hit).
-        if (advancerCorrect) base += 5;
-      }
-    }
-  }
-
+  const base = effectiveBase(prediction, actual, stage);
   if (base <= 0) return 0;
   const mult = multipliers[stage] ?? 1;
 
@@ -365,8 +386,10 @@ export function computeMatchesBucket({ predictions, matches, multipliers = DEFAU
     if (match.status !== 'finished') continue;
     const pred = predictions[match.id];
     if (!pred) continue;
+    // Cravada = placar exato (baseMatchPoints === 8), incluindo empate
+    // exato no mata-mata. Alimenta o tiebreaker do leaderboard.
     const base = baseMatchPoints(pred, match);
-    if (base === 7) exactScores += 1;
+    if (base === 8) exactScores += 1;
     points += matchPoints(pred, match, match.stage, multipliers);
   }
   return { points, exactScores };

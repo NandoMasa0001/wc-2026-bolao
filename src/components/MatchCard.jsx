@@ -5,8 +5,24 @@ import TeamChip from './TeamChip.jsx';
 import ScoreStepper from './ScoreStepper.jsx';
 import Button from './Button.jsx';
 import Modal from './Modal.jsx';
-import { baseMatchPoints, matchPoints, DEFAULT_ROUND_MULTIPLIERS } from '../lib/scoring.js';
+import { effectiveBase, matchPoints, DEFAULT_ROUND_MULTIPLIERS } from '../lib/scoring.js';
+import { isMatchLocked } from '../lib/locking.js';
 import './MatchCard.css';
+
+/**
+ * Human label for an effective-base value (see scoring.effectiveBase).
+ * Covers the knockout tie matrix: 7/6 = cravou o empate, 4 = só quem passa.
+ */
+function verdictLabel(base) {
+  switch (base) {
+    case 8: return 'Cravou!';
+    case 7: return 'Cravou o empate + quem passa';
+    case 6: return 'Cravou o empate (errou quem passa)';
+    case 5: return 'Acertou o resultado';
+    case 4: return 'Acertou quem passa';
+    default: return 'Errou';
+  }
+}
 
 function BreakdownRow({ label, value, strong = false }) {
   return (
@@ -147,19 +163,12 @@ export default function MatchCard({
   const setAwayAndReport = (n) => { setAway(n); reportDraft(home, n, advancer); };
   const setAdvancerAndReport = (v) => { setAdvancer(v); reportDraft(home, away, v); };
 
-  // Lock rule branches by stage:
-  //   - Group matches: lock globally at the tournament's opening kickoff.
-  //   - Knockout matches: lock individually at each match's kickoff (and
-  //     stay locked until both teams are filled in).
-  const tournamentStarted = tournamentStartsAt
-    ? new Date(tournamentStartsAt).getTime() <= Date.now()
-    : false;
-  const kickoffPassed = new Date(match.kickoffAt).getTime() <= Date.now();
+  // Lock rule lives in lib/locking.js — mirrors the Supabase RLS but uses
+  // the device's local clock, so a match locks the instant its kickoff
+  // passes regardless of when the cron flips its status.
   const isLive = match.status === 'live';
   const isFinished = match.status === 'finished';
-  const locked = isKnockout
-    ? (isKnockoutPlaceholder || kickoffPassed || match.status !== 'scheduled')
-    : (tournamentStarted || match.status !== 'scheduled');
+  const locked = isMatchLocked(match, tournamentStartsAt);
   const hasPrediction = !!prediction;
 
   // For group matches the lock is global (apito inicial do mundial), not
@@ -173,21 +182,31 @@ export default function MatchCard({
   let earnedPoints = 0;
   let stageMultiplier = 1;
   if (isFinished && hasPrediction) {
-    earnedBase = baseMatchPoints(prediction, match);
+    earnedBase = effectiveBase(prediction, match, match.stage);
     earnedPoints = matchPoints(prediction, match, match.stage, multipliers);
     stageMultiplier = (multipliers || DEFAULT_ROUND_MULTIPLIERS)[match.stage] ?? 1;
   }
 
   const showSteppers = !locked && (editing || !hasPrediction);
 
-  const handleSave = () => {
-    if (!advancerValid) return;
+  const [saving, setSaving] = useState(false);
+  const handleSave = async () => {
+    if (!advancerValid || saving) return;
     const payload = { homeScore: home, awayScore: away };
     if (needsAdvancer) payload.advancer = advancer;
     else payload.advancer = null; // clear stale advancer if user changed from tie to non-tie
-    onSave?.(payload);
-    setEditing(false);
-    onDraftChange?.(match.id, null);
+    setSaving(true);
+    try {
+      await onSave?.(payload);
+      // Only on success: exit edit mode and clear the draft.
+      setEditing(false);
+      onDraftChange?.(match.id, null);
+    } catch {
+      // Failure already surfaced via toast; keep the draft + edit mode so
+      // the user can retry without re-typing.
+    } finally {
+      setSaving(false);
+    }
   };
 
   const cardClasses = [
@@ -315,7 +334,8 @@ export default function MatchCard({
               <Button
                 variant="primary"
                 onClick={handleSave}
-                disabled={locked || !advancerValid}
+                loading={saving}
+                disabled={locked || !advancerValid || saving}
               >
                 {hasPrediction ? 'Atualizar' : 'Salvar palpite'}
               </Button>
@@ -336,14 +356,14 @@ export default function MatchCard({
               {isFinished && (
                 <span
                   className={
-                    earnedBase >= 7
+                    earnedBase >= 6
                       ? 'match-card__verdict match-card__verdict--exact'
-                      : earnedBase === 5
+                      : earnedBase === 5 || earnedBase === 4
                       ? 'match-card__verdict match-card__verdict--ok'
                       : 'match-card__verdict match-card__verdict--miss'
                   }
                 >
-                  {earnedBase === 8 ? 'Cravou!' : earnedBase === 7 ? 'Cravou (advancer errado)' : earnedBase === 5 ? 'Acertou o resultado' : 'Errou'}
+                  {verdictLabel(earnedBase)}
                 </span>
               )}
               {!isFinished && !locked && (
@@ -359,12 +379,10 @@ export default function MatchCard({
             {isFinished && (
               <aside className="match-card__breakdown" aria-label="Detalhamento da pontuação">
                 <div className="match-card__breakdown-title">Como foi pontuado</div>
-                <BreakdownRow label={
-                  earnedBase === 8 ? 'Cravada'
-                  : earnedBase === 7 ? 'Cravada (advancer errado)'
-                  : earnedBase === 5 ? 'Acertou o resultado'
-                  : 'Nada'
-                } value={`${earnedBase} pt${earnedBase === 1 ? '' : 's'}`} />
+                <BreakdownRow
+                  label={verdictLabel(earnedBase)}
+                  value={`${earnedBase} pt${earnedBase === 1 ? '' : 's'}`}
+                />
                 {stageMultiplier !== 1 && (
                   <BreakdownRow
                     label="Multiplicador da fase"
@@ -382,9 +400,9 @@ export default function MatchCard({
           </div>
         )}
 
-        {/* "Ver palpites dos amigos" — só após a trava global, e só se
-            houver palpites de outros pra mostrar. */}
-        {tournamentStarted && allPlayerPicks && allPlayerPicks.length > 0 && (
+        {/* "Ver palpites dos amigos" — só depois que ESTE jogo trava (apito
+            inicial dele), pra ninguém copiar palpite antes. */}
+        {locked && allPlayerPicks && allPlayerPicks.length > 0 && (
           <button
             type="button"
             className="match-card__see-picks"

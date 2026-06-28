@@ -65,16 +65,19 @@ export default function RegulamentoPage() {
         <div className="reg-section">
           <h4 className="reg-h4">No mata-mata, empate exige escolher quem passa</h4>
           <p>
-            Empate não existe em jogo eliminatório — alguém sempre passa (prorrogação / pênaltis). Por isso, sempre que você palpitar um placar de empate num jogo de mata-mata, é obrigatório escolher também a seleção que avança. O sistema usa essa escolha pra recompensar/penalizar:
+            Empate não existe em jogo eliminatório — alguém sempre passa (prorrogação / pênaltis). Por isso, sempre que você palpitar um placar de empate num jogo de mata-mata, é obrigatório escolher também a seleção que avança. <strong>Quando o jogo real termina empatado</strong>, a pontuação-base é:
           </p>
           <ul className="reg-ul">
-            <li><strong>Cravou o empate + acertou quem passa</strong>: 8 pts cheios.</li>
-            <li><strong>Cravou o empate + errou quem passa</strong>: 7 pts (perde 1).</li>
-            <li><strong>Palpitou empate, real foi não-empate + acertou quem passa</strong>: vira "acertou o resultado" (5 pts).</li>
-            <li><strong>Palpitou empate, real foi não-empate + errou quem passa</strong>: 0.</li>
+            <li><strong>Cravou o empate + acertou quem passa</strong>: 7 pts.</li>
+            <li><strong>Cravou o empate + errou quem passa</strong>: 6 pts.</li>
+            <li><strong>Errou o placar + acertou quem passa</strong>: 4 pts.</li>
+            <li><strong>Errou o placar + errou quem passa</strong>: 0.</li>
           </ul>
+          <p className="muted">
+            Esses valores são base e ainda entram no multiplicador da fase (×1.25 por rodada a partir das oitavas), igual ao resto do mata-mata. Se o jogo <strong>não</strong> terminar empatado, vale a tabela normal (8 / 5 / 0) — e quem palpitou empate mas cravou quem passa nos pênaltis leva 5 ("acertou quem passa").
+          </p>
           <p className="muted reg-foot">
-            Jogos de mata-mata só ficam palpitáveis depois que os times anteriores forem definidos (R32 abre quando grupos terminarem; R16 abre quando R32 terminar; etc.). Cada jogo trava no seu próprio apito inicial.
+            Jogos de mata-mata só ficam palpitáveis depois que os times anteriores forem definidos (R32 abre quando grupos terminarem; R16 abre quando R32 terminar; etc.). Cada jogo trava no seu próprio apito inicial, conferido pelo relógio do seu aparelho — e os palpites dos outros só aparecem depois que o jogo trava.
           </p>
         </div>
       </Card>

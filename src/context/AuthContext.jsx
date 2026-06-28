@@ -114,6 +114,9 @@ function SupabaseAuthProvider({ children }) {
         .select('name, is_admin')
         .eq('id', uid)
         .maybeSingle();
+      // No players row → account was removed by the admin. Do NOT recreate
+      // it here (that would resurrect intentionally-deleted players); just
+      // stay logged out.
       if (cancelled || !row) return;
       setSession({
         id: uid,
