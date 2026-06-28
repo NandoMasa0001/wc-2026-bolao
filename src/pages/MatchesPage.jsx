@@ -188,6 +188,8 @@ export default function MatchesPage() {
         </Link>
       </div>
 
+      <KnockoutScoreBanner />
+
       {totalGoals > 0 && totalGoals < 100 && (
         <GoalCounter total={totalGoals} />
       )}
@@ -295,6 +297,43 @@ export default function MatchesPage() {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Dismissible info banner clarifying that, in knockout matches, the predicted
+ * SCORE is judged against the result after extra time (prorrogação) — not just
+ * the 90 minutes. Penalties don't change the score; they only decide who
+ * advances (the player's "quem passa" pick). Hides for good once dismissed.
+ */
+function KnockoutScoreBanner() {
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem('knockout-et-banner-dismissed') === '1'; }
+    catch { return false; }
+  });
+  if (dismissed) return null;
+
+  const dismiss = () => {
+    try { localStorage.setItem('knockout-et-banner-dismissed', '1'); } catch { /* ignore */ }
+    setDismissed(true);
+  };
+
+  return (
+    <div className="kb-banner" role="note" aria-label="Como funciona o placar no mata-mata">
+      <span className="kb-banner__icon" aria-hidden="true">⏱️</span>
+      <span className="kb-banner__text">
+        <strong>Mata-mata conta a prorrogação.</strong>{' '}
+        No mata-mata, o placar que você palpita vale o resultado <strong>após a prorrogação</strong> (os 30 min extras), não só os 90. Se o jogo terminar empatado mesmo após a prorrogação, quem avança nos pênaltis é definido pela sua escolha de <strong>“quem passa”</strong>.
+      </span>
+      <button
+        type="button"
+        onClick={dismiss}
+        className="kb-banner__close"
+        aria-label="Fechar aviso"
+      >
+        ×
+      </button>
+    </div>
   );
 }
 

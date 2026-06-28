@@ -132,6 +132,52 @@
   min-width: 0;
 }
 
+/* Dismissible info banner — clarifies knockout score counts extra time. */
+.kb-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-blue-soft);
+  border: 1px solid rgba(0, 73, 144, 0.18);
+  border-radius: var(--r-md);
+  color: var(--text-primary);
+}
+
+.kb-banner__icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.kb-banner__text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-normal);
+}
+
+.kb-banner__close {
+  background: transparent;
+  border: 0;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kb-banner__close:hover {
+  background: rgba(0, 73, 144, 0.12);
+}
+
 .pending-nudge__text strong {
   color: var(--c-blue);
   font-weight: var(--fw-bold);
