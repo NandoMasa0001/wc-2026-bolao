@@ -422,16 +422,27 @@ export default function MatchCard({
           picks={allPlayerPicks || []}
           isFinished={isFinished}
           actualScore={isFinished ? { home: match.homeScore, away: match.awayScore } : null}
+          isKnockout={isKnockout}
+          match={match}
+          homeTeam={homeTeam}
+          awayTeam={awayTeam}
         />
       </Modal>
     </Card>
   );
 }
 
-function PlayerPicksTable({ picks, isFinished, actualScore }) {
+function PlayerPicksTable({ picks, isFinished, actualScore, isKnockout, match, homeTeam, awayTeam }) {
   if (picks.length === 0) {
     return <p className="muted">Ninguém palpitou esse jogo.</p>;
   }
+  // Resolve an advancer team code to a readable name (falls back to the code).
+  const advancerName = (code) => {
+    if (!code) return null;
+    if (code === match?.homeTeam) return homeTeam?.name || code;
+    if (code === match?.awayTeam) return awayTeam?.name || code;
+    return code;
+  };
   return (
     <div className="picks-table-wrap">
       {isFinished && actualScore && (
@@ -444,6 +455,7 @@ function PlayerPicksTable({ picks, isFinished, actualScore }) {
           <tr>
             <th>Jogador</th>
             <th className="ta-c">Palpite</th>
+            {isKnockout && <th className="ta-c">Passa</th>}
             {isFinished && <th className="ta-c">Pts</th>}
           </tr>
         </thead>
@@ -452,6 +464,9 @@ function PlayerPicksTable({ picks, isFinished, actualScore }) {
             const isExact = isFinished && actualScore &&
               prediction.homeScore === actualScore.home &&
               prediction.awayScore === actualScore.away;
+            // "Quem passa" only matters when the player predicted a tie.
+            const predictedTie = prediction.homeScore === prediction.awayScore;
+            const adv = predictedTie ? advancerName(prediction.advancer) : null;
             return (
               <tr key={player.id} className={isExact ? 'is-exact' : ''}>
                 <td>{player.name}</td>
@@ -459,6 +474,11 @@ function PlayerPicksTable({ picks, isFinished, actualScore }) {
                   {prediction.homeScore}–{prediction.awayScore}
                   {isExact && <span title="Cravou!" aria-label="Cravou"> ✓</span>}
                 </td>
+                {isKnockout && (
+                  <td className="ta-c">
+                    {adv ? adv : <span className="muted">—</span>}
+                  </td>
+                )}
                 {isFinished && (
                   <td className="ta-c tabular">{prediction.points || 0}</td>
                 )}
