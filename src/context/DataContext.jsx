@@ -377,6 +377,33 @@ const fromExtraRow = (r) => ({
   points:           r.points
 });
 
+/**
+ * Fetch EVERY row of a table, paging past PostgREST's default 1000-row cap.
+ *
+ * Critical for `predictions`: once a league passes 1000 prediction rows
+ * (104 matches × ~15 players can reach ~1500), a plain `.select('*')`
+ * silently returns only the first 1000 — so the rows past the cap never
+ * load and those picks "disappear" from the UI even though they're saved
+ * in the DB. This pages in 1000-row chunks until the table is exhausted.
+ */
+async function fetchAllRows(table) {
+  const PAGE = 1000;
+  let from = 0;
+  const rows = [];
+  for (;;) {
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .range(from, from + PAGE - 1);
+    if (error) { console.error(`fetchAllRows(${table})`, error); break; }
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return rows;
+}
+
 function SupabaseDataProvider({ children }) {
   const { session } = useAuth();
 
@@ -458,7 +485,9 @@ function SupabaseDataProvider({ children }) {
         supabase.from('teams').select('*'),
         supabase.from('matches').select('*'),
         supabase.from('players').select('*'),
-        supabase.from('predictions').select('*'),
+        // Paginated: predictions can exceed PostgREST's 1000-row cap, which
+        // would silently drop picks past row 1000 (they vanish from the UI).
+        fetchAllRows('predictions').then((data) => ({ data })),
         supabase.from('advancement_predictions').select('*'),
         supabase.from('finals_predictions').select('*'),
         supabase.from('award_predictions').select('*'),

@@ -67,11 +67,25 @@ async function dumpLeague(league) {
   };
 
   for (const t of TABLES) {
-    const { data, error } = await supabase.from(t).select('*');
-    if (error) {
-      console.error(`[${league.name}] ${t}: ${error.message}`);
-      continue;
+    // Paginate past PostgREST's 1000-row cap so big tables (predictions)
+    // aren't silently truncated in the backup.
+    const PAGE = 1000;
+    let from = 0;
+    const data = [];
+    let failed = false;
+    for (;;) {
+      const { data: chunk, error } = await supabase.from(t).select('*').range(from, from + PAGE - 1);
+      if (error) {
+        console.error(`[${league.name}] ${t}: ${error.message}`);
+        failed = true;
+        break;
+      }
+      if (!chunk || chunk.length === 0) break;
+      data.push(...chunk);
+      if (chunk.length < PAGE) break;
+      from += PAGE;
     }
+    if (failed) continue;
     dump.tables[t] = data;
     console.log(`[${league.name}] ${t}: ${data.length} rows`);
   }

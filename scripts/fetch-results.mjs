@@ -119,6 +119,26 @@ async function flushUpdates(supabase, table, rows, onConflict, name) {
   }
 }
 
+/**
+ * Fetch EVERY row of a table, paging past PostgREST's default 1000-row cap.
+ * Without this the scorer only sees the first 1000 predictions once a league
+ * grows past that — picks beyond row 1000 would never get scored.
+ */
+async function fetchAllRows(supabase, table) {
+  const PAGE = 1000;
+  let from = 0;
+  const rows = [];
+  for (;;) {
+    const { data, error } = await supabase.from(table).select('*').range(from, from + PAGE - 1);
+    if (error) { console.error(`fetchAllRows(${table}):`, error.message); break; }
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return rows;
+}
+
 /* -------------------------------------------------------------------- */
 /* Process one league's database.                                       */
 /* -------------------------------------------------------------------- */
@@ -253,7 +273,9 @@ async function runForLeague({ league, apiMatches, championOdds, primaryResults, 
   }
 
   // ---- Score predictions (placar) ----
-  const { data: predRows } = await supabase.from('predictions').select('*');
+  // Paginated: past 1000 rows a plain select silently drops the rest, which
+  // would leave later picks unscored.
+  const predRows = await fetchAllRows(supabase, 'predictions');
   const { data: matchRowsAll } = await supabase.from('matches').select('*');
   const matchesById = Object.fromEntries(
     (matchRowsAll || []).map((m) => [m.id, {
