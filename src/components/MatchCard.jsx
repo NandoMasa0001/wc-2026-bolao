@@ -20,6 +20,7 @@ function verdictLabel(base) {
     case 6: return 'Cravou o empate (errou quem passa)';
     case 5: return 'Acertou o resultado';
     case 4: return 'Acertou quem passa';
+    case 2.5: return 'Acertou quem passa (palpitou empate)';
     default: return 'Errou';
   }
 }
@@ -358,7 +359,7 @@ export default function MatchCard({
                   className={
                     earnedBase >= 6
                       ? 'match-card__verdict match-card__verdict--exact'
-                      : earnedBase === 5 || earnedBase === 4
+                      : earnedBase >= 2.5
                       ? 'match-card__verdict match-card__verdict--ok'
                       : 'match-card__verdict match-card__verdict--miss'
                   }

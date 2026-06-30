@@ -109,9 +109,12 @@ export function pickedOutcomeProb(prediction, odds) {
  * they predicted a decisive score. The real advancer is `actual.winner`
  * (set by the cron on shootout results), falling back to the score sign.
  *
- * Knockout matches with a DECISIVE result keep the standard 8/5/0, plus
- * the legacy credit: a player who predicted a draw but named the correct
- * advancer still gets 5 ("acertou quem passa via pênaltis").
+ * Knockout matches with a DECISIVE result keep the standard 8/5/0. A player
+ * who predicted a DRAW but named the correct advancer gets 2.5 — half of the
+ * 5 that committing to that team's win is worth (hedging shouldn't pay like
+ * conviction). The penalty shootout never enters the placar: the stored score
+ * is the 120-minute result (see footballApi adapter), so a pens game is a
+ * TIE here and the 7/6/4/0 tie matrix above applies.
  */
 export function effectiveBase(prediction, actual, stage) {
   const base = baseMatchPoints(prediction, actual);
@@ -149,9 +152,11 @@ export function effectiveBase(prediction, actual, stage) {
     return advancerCorrect ? 4 : 0;
   }
 
-  // Actual decisive: credit a draw-predictor who named the right team to
-  // go through (0 → 5, same as a normal outcome hit).
-  if (predictedTie && advancerCorrect) return base + 5;
+  // Actual decided in 120 min: a player who predicted a DRAW but named the
+  // right team to advance gets HALF of what predicting that team's win is
+  // worth (a win-for-the-right-team hit = 5 → this hedge = 2.5). Committing
+  // to the win should always beat hedging on a tie + advancer.
+  if (predictedTie && advancerCorrect) return 2.5;
   return base;
 }
 

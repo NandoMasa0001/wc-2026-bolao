@@ -93,6 +93,22 @@ export async function fetchMatches({ apiKey, competition = 'WC', teamsByApiId = 
   const out = [];
   for (const m of data.matches || []) {
     const stage = STAGE_MAP[m.stage] || (m.stage || '').toLowerCase();
+
+    // Penalty shootouts: football-data.org folds the shootout INTO `fullTime`
+    // (a 1–1 decided on pens shows up as e.g. 3–4 = regularTime+extraTime+
+    // penalties). We want the placar to be the 120-minute result only — the
+    // shootout merely decides who advances (kept in `winner`). So for a
+    // PENALTY_SHOOTOUT we use regularTime + extraTime (always a draw); for
+    // everything else `fullTime` is already the right 90/120-min score.
+    const sc = m.score || {};
+    const isShootout = sc.duration === 'PENALTY_SHOOTOUT';
+    const homeScore = isShootout
+      ? (sc.regularTime?.home ?? 0) + (sc.extraTime?.home ?? 0)
+      : (sc.fullTime?.home ?? null);
+    const awayScore = isShootout
+      ? (sc.regularTime?.away ?? 0) + (sc.extraTime?.away ?? 0)
+      : (sc.fullTime?.away ?? null);
+
     out.push({
       id: `API-${m.id}`,
       apiId: m.id,
@@ -105,8 +121,8 @@ export async function fetchMatches({ apiKey, competition = 'WC', teamsByApiId = 
       awayPlaceholder: m.awayTeam?.name && !m.awayTeam?.id ? m.awayTeam.name : null,
       kickoffAt: m.utcDate,
       status: mapStatus(m.status),
-      homeScore: m.score?.fullTime?.home ?? null,
-      awayScore: m.score?.fullTime?.away ?? null,
+      homeScore,
+      awayScore,
       winner: m.score?.winner === 'HOME_TEAM'
         ? lookupCode(m.homeTeam, teamsByApiId)
         : m.score?.winner === 'AWAY_TEAM'
