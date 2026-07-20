@@ -276,16 +276,48 @@ export function scoreFinalists(predictedFinalists = [], actualFinalists = [], te
 }
 
 /**
+ * Fuzzy name match for free-text player answers (awards + goal scorers).
+ *
+ * Accent-, case- and punctuation-insensitive, and matches on token PREFIXES
+ * so real-world spelling drift still counts: "Vini Jr" == "Vinícius Júnior",
+ * "Kylian Mbappé" == "mbappe", "Unai Simón" == "unai simon". Filler tokens
+ * (jr/junior/de/da/do/dos) are ignored. The owner wants these categories to
+ * count even when friends type a nickname, drop an accent, or add the first
+ * name (CLAUDE.md — "no need to be exact"). A dropped/added *inner* letter
+ * (e.g. "Mbape") won't match, since the rule is prefix-based, not edit-distance.
+ */
+const NAME_STOPWORDS = new Set(['jr', 'junior', 'filho', 'de', 'da', 'do', 'dos']);
+function normalizeName(s) {
+  return String(s == null ? '' : s)
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function nameTokens(s) {
+  return normalizeName(s).split(' ').filter((t) => t && !NAME_STOPWORDS.has(t));
+}
+export function fuzzyNameMatch(a, b) {
+  if (!a || !b) return false;
+  if (normalizeName(a) === normalizeName(b)) return true;
+  const ta = nameTokens(a);
+  const tb = nameTokens(b);
+  if (!ta.length || !tb.length) return false;
+  for (const x of ta) {
+    for (const y of tb) {
+      if (x.length >= 3 && y.length >= 3 && (x.startsWith(y) || y.startsWith(x))) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Awards: 20 each, no boost (no public odds market for awards).
  * Four awards: best player, young player, goalkeeper, top scorer. Max 80.
+ * Names are matched fuzzily — see `fuzzyNameMatch`.
  */
 export function scoreAwards(predicted = {}, actual = {}) {
-  const norm = (s) => (typeof s === 'string' ? s.trim().toLowerCase() : null);
   let points = 0;
   for (const key of ['bestPlayer', 'youngPlayer', 'goalkeeper', 'topScorer']) {
-    const p = norm(predicted[key]);
-    const a = norm(actual[key]);
-    if (p && a && p === a) points += reduce(20); // 20 → 14
+    if (fuzzyNameMatch(predicted[key], actual[key])) points += reduce(20); // 20 → 14
   }
   return points;
 }
@@ -335,6 +367,11 @@ export function scoreExactText(predicted, actual, points) {
   return norm(predicted) === norm(actual) ? points : 0;
 }
 
+/** Fuzzy text scoring for player-name answers — see `fuzzyNameMatch`. */
+export function scoreFuzzyText(predicted, actual, points) {
+  return fuzzyNameMatch(predicted, actual) ? points : 0;
+}
+
 /** Boolean scoring. */
 export function scoreBoolean(predicted, actual, points) {
   if (predicted == null || actual == null) return 0;
@@ -367,14 +404,14 @@ export function scoreExtras(predicted = {}, actual = {}, teamBoosts = {}) {
   // 4. Top scorer goal count (20 → 14, EXACT)
   total += reduce(scoreExactNumber(predicted.topScorerGoals, actual.topScorerGoals, 20));
 
-  // 5. First goal scorer for Brazil (25 → 18)
-  total += reduce(scoreExactText(predicted.firstGoalBrazil, actual.firstGoalBrazil, 25));
+  // 5. First goal scorer for Brazil (25 → 18) — fuzzy name match
+  total += reduce(scoreFuzzyText(predicted.firstGoalBrazil, actual.firstGoalBrazil, 25));
 
-  // 6. Last goal scorer for Brazil (25 → 18)
-  total += reduce(scoreExactText(predicted.lastGoalBrazil, actual.lastGoalBrazil, 25));
+  // 6. Last goal scorer for Brazil (25 → 18) — fuzzy name match
+  total += reduce(scoreFuzzyText(predicted.lastGoalBrazil, actual.lastGoalBrazil, 25));
 
-  // 7. 100th goal of the WC (50 → 35)
-  total += reduce(scoreExactText(predicted.hundredthGoal, actual.hundredthGoal, 50));
+  // 7. 100th goal of the WC (50 → 35) — fuzzy name match
+  total += reduce(scoreFuzzyText(predicted.hundredthGoal, actual.hundredthGoal, 50));
 
   return total;
 }
