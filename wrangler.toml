@@ -4,7 +4,7 @@
 # `name` via wrangler's --env flag. Default (no --env) deploys as the
 # original "bolaotrupe" league; --env familia deploys the family league.
 
-name = "wc-2026-bolao"
+name = "bolaofamilia"
 compatibility_date = "2026-05-25"
 
 [assets]
